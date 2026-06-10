@@ -1,7 +1,7 @@
 from langchain_core.messages import HumanMessage, AIMessageChunk
-from app.agent.chat_agent import get_agent
+from app.agent.chat_agent import chat_agent
 from app.models import ChatRequest
-from app.core.logger import logger
+from app.utils.logger import logger
 
 async def chat_streaming_response(request: ChatRequest):
     thread_id = request.id
@@ -10,7 +10,7 @@ async def chat_streaming_response(request: ChatRequest):
                  f"thread_id={thread_id}    "
                  f"message={message}")
     try:
-        for chunk, metadata in  get_agent().stream(
+        for chunk, metadata in chat_agent.stream(
                 {"messages": [HumanMessage(message)]},
                 {"configurable": {"thread_id": thread_id}},
                 stream_mode="messages"

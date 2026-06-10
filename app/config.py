@@ -10,5 +10,6 @@ class Settings(BaseSettings):
     DASHSCOPE_BASE_URL: str
     TAVILY_API_KEY: str
     WEB_SEARCH_MAX_RESULTS: int = 2
+    LOG_LEVEL: str
 
 config = Settings()

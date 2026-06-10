@@ -5,7 +5,7 @@ from app.services.chat_service import chat_streaming_response
 
 router = APIRouter()
 
-@router.post("/chat/chat")
+@router.post("/chat/invoke")
 async def chat(request: ChatRequest):
     """调用chat service"""
     return {
@@ -22,7 +22,6 @@ async def chat(request: ChatRequest):
 async def chat_stream(request: ChatRequest):
     """调用chat service (流式)"""
     return StreamingResponse(chat_streaming_response(request), media_type="text/event-stream")
-
 
 @router.get("/chat/delete_session")
 async def delete_session(id: str):

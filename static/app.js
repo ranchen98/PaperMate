@@ -149,7 +149,7 @@
 
     // ==================== API 调用 ====================
     async function sendNonStream(message) {
-        const resp = await fetch('/chat/chat', {
+        const resp = await fetch('/chat/invoke', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ Id: currentSessionId, Message: message })
