@@ -1,7 +1,7 @@
 from langchain_core.messages import HumanMessage, AIMessageChunk
 from app.agent.chat_agent import chat_agent
-from app.models import ChatRequest
-from app.utils.logger import logger
+from app.model import ChatRequest
+from app.utils.logger_handler import logger
 
 async def chat_streaming_response(request: ChatRequest):
     thread_id = request.id
@@ -16,7 +16,6 @@ async def chat_streaming_response(request: ChatRequest):
                 stream_mode="messages"
         ):
             if isinstance(chunk, AIMessageChunk) and chunk.content:
-                logger.debug("AIMessageChunk:" + str(chunk.content))
                 yield f"data: {chunk.content}\n\n"
     except Exception as e:
         logger.error(f"chat_streaming_response(): {str(e)}")

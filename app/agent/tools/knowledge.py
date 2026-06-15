@@ -1,11 +1,10 @@
 from langchain.tools import tool
 from langchain_tavily import TavilySearch
-from app.config import Settings
+from app.utils.config_handler import env, agent_config
 
-config = Settings()
 tavily_search = TavilySearch(
-    tavily_api_key= config.TAVILY_API_KEY,
-    max_results = config.WEB_SEARCH_MAX_RESULTS,
+    tavily_api_key= env.TAVILY_API_KEY,
+    max_results = agent_config["web_search_max_results"],
     topic = "general"
 )
 

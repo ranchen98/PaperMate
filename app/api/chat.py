@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from app.models import ChatRequest
+from app.model import ChatRequest
 from app.services.chat_service import chat_streaming_response
 
 router = APIRouter()

@@ -13,10 +13,13 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "pydantic-settings>=2.14.1",
     "lru-cache>=0.2.3",
-    "checkpointer>=2.14.11",
-    "path>=17.1.1",
+    "langchain-community",
+    "langchain-chroma>=1.1.0",
 ]
 
 [[tool.uv.index]]
-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+url = "https://mirrors.aliyun.com/pypi/simple"
 default = true
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
