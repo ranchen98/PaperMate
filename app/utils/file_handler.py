@@ -1,7 +1,10 @@
 import os, hashlib
+import warnings
 from app.utils.logger_handler import logger
 from langchain_core.documents import Document
-from langchain_community.document_loaders import PyPDFLoader, TextLoader
+
+warnings.filterwarnings("ignore", message="`langchain-community` is being sunset")
+from langchain_community.document_loaders import PyPDFLoader, TextLoader  # noqa: E402
 
 def get_file_md5_hex(file_path: str):
     if not os.path.exists(file_path):
@@ -36,4 +39,4 @@ def pdf_loader(file_path: str, password = None) -> list[Document]:
     return PyPDFLoader(file_path, password).load()
 
 def txt_loader(file_path: str) -> list[Document]:
-    return TextLoader(file_path).load()
+    return TextLoader(file_path, encoding="utf-8").load()

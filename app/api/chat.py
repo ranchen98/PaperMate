@@ -1,13 +1,13 @@
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from app.model import ChatRequest
-from app.services.chat_service import chat_streaming_response
+from app.business.chat_request import ChatRequest
+from app.services.chat_service import chat_service
 
 router = APIRouter()
 
 @router.post("/chat/invoke")
 async def chat(request: ChatRequest):
-    """调用chat service"""
+    """调用agent对话 (非流式)"""
     return {
         "code": 200,
         "message": "success",
@@ -20,8 +20,8 @@ async def chat(request: ChatRequest):
 
 @router.post("/chat/stream")
 async def chat_stream(request: ChatRequest):
-    """调用chat service (流式)"""
-    return StreamingResponse(chat_streaming_response(request), media_type="text/event-stream")
+    """调用agent对话 (流式)"""
+    return StreamingResponse(chat_service.chat_streaming_response(request), media_type="text/event-stream")
 
 @router.get("/chat/delete_session")
 async def delete_session(id: str):

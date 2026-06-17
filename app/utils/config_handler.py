@@ -17,7 +17,6 @@ def _load_yaml_config(config_path: str):
     with open(config_path, "r", encoding='utf-8') as f:
         return yaml.load(f, Loader=yaml.FullLoader)
 
-rag_config = _load_yaml_config(get_abs_path("config/rag.yaml"))
 agent_config = _load_yaml_config(get_abs_path("config/agent.yaml"))
-prompt_config = _load_yaml_config(get_abs_path("config/prompts.yaml"))
+prompt_config = _load_yaml_config(get_abs_path("config/prompt.yaml"))
 chroma_config = _load_yaml_config(get_abs_path("config/chroma.yaml"))

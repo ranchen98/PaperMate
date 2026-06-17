@@ -13,7 +13,7 @@
     const currentSessionTitle = $('#current-session-title');
 
     // ==================== 状态 ====================
-    const STORAGE_KEY = 'rocomate_sessions';
+    const STORAGE_KEY = 'papermate_sessions';
     let sessions = [];           // { id, title, messages: [{role, content}] }
     let currentSessionId = null;
     let isStreaming = false;
@@ -105,7 +105,7 @@
 
         const label = document.createElement('div');
         label.className = 'role-label';
-        label.textContent = role === 'user' ? 'You' : 'RocoMate';
+        label.textContent = role === 'user' ? 'You' : 'PaperMate';
 
         const body = document.createElement('div');
         body.className = 'message-body';
@@ -179,7 +179,7 @@
         msgEl.className = 'message assistant streaming';
         const label = document.createElement('div');
         label.className = 'role-label';
-        label.textContent = 'RocoMate';
+        label.textContent = 'PaperMate';
         const body = document.createElement('div');
         body.className = 'message-body';
         body.textContent = '';

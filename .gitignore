@@ -2,6 +2,8 @@
 .idea/
 .langgraph_api/
 resources/checkpoint/
+resources/chroma/
+resources/data/
 log/
 __pycache__/
 .venv/
