@@ -1,9 +1,11 @@
+from typing import Optional
+
 from langchain.tools import tool
 from langchain_tavily import TavilySearch
-from typing import Optional
+
 from app.business.search_knowledge_input import SearchPaperKnowledgeInput, GetPaperChunkContextInput
 from app.services.vector_store_service import vector_store_service
-from app.utils.config_handler import env, agent_config
+from app.utils.config_handler import agent_config, env
 
 tavily_search = TavilySearch(
     tavily_api_key= env.TAVILY_API_KEY,

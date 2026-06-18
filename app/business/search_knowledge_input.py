@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
 from typing import Optional
+
+from pydantic import BaseModel, Field
 
 class SearchPaperKnowledgeInput(BaseModel):
     query: str = Field(description="用户针对论文知识的提问词，用于从向量数据库中检索相关论文内容。请提炼用户意图，不要直接复制用户的原话。")

@@ -24,7 +24,7 @@ async def chat_stream(request: ChatRequest):
     return StreamingResponse(chat_service.chat_streaming_response(request), media_type="text/event-stream")
 
 @router.get("/chat/delete_session")
-async def delete_session(id: str):
+async def delete_session(thread_id: str):
     """调用delete session service"""
     return {
         "code": 200,
@@ -37,14 +37,6 @@ async def delete_session(id: str):
     }
 
 @router.get("/chat/get_history")
-async def get_history(id: str):
-    """调用get history service"""
-    return {
-        "code": 200,
-        "message": "success",
-        "data": {
-            "success": True,
-            "content": "",
-            "errorMessage": None
-        }
-    }
+async def get_history(thread_id: str):
+    """根据thread_id，获取会话历史"""
+    return chat_service.get_history(thread_id)
