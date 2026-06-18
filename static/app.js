@@ -152,7 +152,7 @@
         const resp = await fetch('/chat/invoke', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ Id: currentSessionId, Message: message })
+            body: JSON.stringify({ thread_id: currentSessionId, message: message })
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const result = await resp.json();
@@ -166,7 +166,7 @@
         const resp = await fetch('/chat/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ Id: currentSessionId, Message: message })
+            body: JSON.stringify({ thread_id: currentSessionId, message: message })
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
@@ -285,7 +285,7 @@
     btnDeleteSession.addEventListener('click', () => {
         if (!confirm('确定要删除当前对话吗？')) return;
         // 调用后端接口 (fire-and-forget)
-        fetch(`/chat/delete_session?id=${encodeURIComponent(currentSessionId)}`);
+        fetch(`/chat/delete_session?thread_id=${encodeURIComponent(currentSessionId)}`);
         deleteCurrentSession();
         msgInput.focus();
     });
