@@ -21,8 +21,13 @@ class ChatAgent:
         logger.debug("[ChatAgent] 初始化成功")
 
     def stream(self, request: ChatRequest):
+        # 测试分支：query 为 "test" 时直接返回 "call success"，不调用 agent，避免消耗 token
+        if request.message == "test":
+            logger.info("[ChatAgent] test query detected, return 'call success' directly")
+            yield AIMessageChunk(content="call success"), {}
+            return
         config = RunnableConfig(configurable={"thread_id": request.thread_id})
-        return self.agent.stream(
+        yield from self.agent.stream(
             input={"messages": [build_human_message(request.message)]},
             config=config,
             stream_mode="messages"
@@ -38,7 +43,6 @@ class ChatAgent:
     def get_state(self, thread_id: str):
         config = RunnableConfig(configurable={"thread_id": thread_id})
         return self.agent.get_state(config)
-
 
 chat_agent = ChatAgent()
 

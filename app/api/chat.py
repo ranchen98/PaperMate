@@ -40,3 +40,8 @@ async def delete_session(thread_id: str):
 async def get_history(thread_id: str):
     """根据thread_id，获取会话历史"""
     return chat_service.get_history(thread_id)
+
+@router.get("/chat/get_thread_ids")
+async def get_thread_ids(user_id: str):
+    """根据 user_id 查询其所有 thread_id 列表"""
+    return chat_service.get_thread_ids(user_id)
