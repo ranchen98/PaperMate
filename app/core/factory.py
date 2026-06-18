@@ -9,6 +9,7 @@ from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
 from langgraph.graph.state import CompiledStateGraph
 
+from app.utils.checkpointer_handler import checkpointer
 from app.utils.config_handler import agent_config, env
 
 warnings.filterwarnings("ignore", message="`langchain-community` is being sunset")
@@ -47,6 +48,7 @@ class ReActAgentFactory:
             system_prompt=load_system_prompts(),
             tools=[web_search, search_paper_knowledge, get_paper_chunk_context],
             middleware=[monitor_tool, monitor_before_model],
+            checkpointer=checkpointer,
         )
 
 react_agent = ReActAgentFactory().new()
