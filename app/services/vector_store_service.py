@@ -3,7 +3,7 @@ import os
 from langchain_chroma import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from app.core.factory import embedding_model
+from app.agent.model.factory import embedding_model
 from app.utils.config_handler import chroma_config
 from app.utils.file_handler import txt_loader, pdf_loader, listdir_with_allowed_type, get_file_md5_hex
 from app.utils.logger_handler import logger

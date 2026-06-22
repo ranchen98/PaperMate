@@ -1,7 +1,7 @@
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
-from app.core.factory import chat_model
+from app.agent.model.factory import chat_model
 from app.services.vector_store_service import VectorStoreService
 from app.utils.prompt_loader import load_rag_summarize_prompt
 

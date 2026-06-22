@@ -5,6 +5,7 @@ from app.utils.db_handler import db_connection
 from app.agent.chat_agent import chat_agent
 from app.utils.logger_handler import logger
 from app.business.chat_request import ChatRequest
+import json
 
 class ChatService:
     def chat_streaming_response(self, request: ChatRequest):
@@ -12,11 +13,19 @@ class ChatService:
             logger.info(f"[chat_streaming_response]: {str(request)}")
             self._ensure_thread_record(request.user_id, request.thread_id, request.message)
             for chunk, metadata in chat_agent.stream(request):
-                if isinstance(chunk, AIMessageChunk) and chunk.content:
-                    yield f"data: {chunk.content}\n\n"
+                if isinstance(chunk, AIMessageChunk):
+                    if metadata.get("lc_source") == "summarization":
+                        continue
+                    if chunk.content:
+                        yield f"data: {json.dumps({'role': 'ai', 'content': chunk.content}, ensure_ascii=False)}\n\n"
+                elif isinstance(chunk, ToolMessage):
+                    tool_name = chunk.name or ""
+                    if tool_name:
+                        yield f"data: {json.dumps({'role': 'tool', 'tool_name': tool_name}, ensure_ascii=False)}\n\n"
         except Exception as e:
             logger.error(f"[chat_streaming_response]: {str(e)}")
-            yield f"data: {"调用失败"}\n\n"
+            err = json.dumps({"code": 500, "message": str(e) or "调用失败"}, ensure_ascii=False)
+            yield f"event: error\ndata: {err}\n\n"
 
     def get_thread_ids(self, user_id: str):
         """根据 user_id 查询其所有会话列表，按 update_time 倒序返回。
@@ -33,7 +42,7 @@ class ChatService:
             {
                 "thread_id": row["thread_id"],
                 "latest_message": row["latest_message"] or "",
-                "update_time": row["update_time"] or "",
+                "update_time": (row["update_time"].replace(" ", "T") + "Z") if row["update_time"] else "",
             }
             for row in rows
         ]
@@ -65,6 +74,8 @@ class ChatService:
         logger.info(f"[get_history]: {thread_id}")
         config = RunnableConfig(configurable={"thread_id": thread_id})
         checkpoint_tuple = checkpointer.get_tuple(config)
+        if checkpoint_tuple is None:
+            return []
         messages = checkpoint_tuple.checkpoint["channel_values"]["messages"]
         return self._clean_messages(messages)
 
@@ -75,10 +86,14 @@ class ChatService:
           - HumanMessage: role=human, content=content, timestamp=additional_kwargs.timestamp
           - AIMessage:    role=ai,     content=content
           - ToolMessage:  role=tool,   tool_name=name
-        过滤规则: content 与 tool_name 均为空的消息不返回。
+        过滤规则:
+          - 跳过总结服务注入的消息（additional_kwargs.lc_source == "summarization"）
+          - content 与 tool_name 均为空的消息不返回
         """
         cleaned = []
         for msg in messages:
+            if msg.additional_kwargs.get("lc_source") == "summarization":
+                continue
             item = {"role": "", "content": "", "timestamp": "", "tool_name": ""}
             if isinstance(msg, HumanMessage):
                 item["role"] = "human"

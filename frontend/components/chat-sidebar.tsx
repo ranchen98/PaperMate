@@ -1,0 +1,141 @@
+"use client";
+
+import { Plus, MessageSquare, Trash2, X } from "lucide-react";
+import { cn, formatTime } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { ModeToggle } from "@/components/mode-toggle";
+import type { Thread } from "@/lib/types";
+
+type ChatSidebarProps = {
+  threads: Thread[];
+  currentThreadId: string | null;
+  isLoading: boolean;
+  isOpen: boolean;
+  onClose: () => void;
+  onNewThread: () => void;
+  onSelectThread: (threadId: string) => void;
+  onDeleteThread: (threadId: string) => void;
+};
+
+export function ChatSidebar({
+  threads,
+  currentThreadId,
+  isLoading,
+  isOpen,
+  onClose,
+  onNewThread,
+  onSelectThread,
+  onDeleteThread,
+}: ChatSidebarProps) {
+  return (
+    <>
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r bg-sidebar transition-transform md:static md:translate-x-0",
+          isOpen ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
+        <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="size-5 text-primary" />
+            <span className="text-lg font-semibold">PaperMate</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <ModeToggle />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={onClose}
+            >
+              <X />
+            </Button>
+          </div>
+        </div>
+
+        <div className="p-3">
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-2"
+            onClick={onNewThread}
+          >
+            <Plus className="size-4" />
+            新建对话
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-2 pb-3">
+          {isLoading ? (
+            <div className="space-y-2 px-2 py-2">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="h-14 animate-pulse rounded-lg bg-muted"
+                />
+              ))}
+            </div>
+          ) : threads.length === 0 ? (
+            <p className="px-3 py-8 text-center text-sm text-muted-foreground">
+              暂无会话
+            </p>
+          ) : (
+            <ul className="space-y-1">
+              {threads.map((thread) => {
+                const active = thread.thread_id === currentThreadId;
+                return (
+                  <li key={thread.thread_id}>
+                    <div
+                      className={cn(
+                        "group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 transition-colors",
+                        active
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "hover:bg-sidebar-accent/60",
+                      )}
+                      onClick={() => onSelectThread(thread.thread_id)}
+                    >
+                      <MessageSquare
+                        className={cn(
+                          "size-4 shrink-0",
+                          active
+                            ? "text-sidebar-accent-foreground"
+                            : "text-muted-foreground",
+                        )}
+                      />
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="truncate text-sm font-medium">
+                          {thread.latest_message || "新对话"}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatTime(thread.update_time)}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteThread(thread.thread_id);
+                        }}
+                        title="删除对话"
+                      >
+                        <Trash2 className="text-destructive" />
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </aside>
+    </>
+  );
+}

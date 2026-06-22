@@ -22,11 +22,11 @@ class BaseModelFactory(ABC):
 class ChatModelFactory(BaseModelFactory):
     def new(self) -> BaseChatModel:
         return init_chat_model(
-        model=agent_config["chat_model_name"],
-        model_provider=agent_config["chat_model_provider"],
-        base_url=env.DASHSCOPE_BASE_URL,
-        api_key=env.DASHSCOPE_API_KEY
-    )
+            model=agent_config["chat_model_name"],
+            model_provider=agent_config["chat_model_provider"],
+            base_url=env.DASHSCOPE_BASE_URL,
+            api_key=env.DASHSCOPE_API_KEY
+        )
 
 chat_model = ChatModelFactory().new()
 
@@ -36,9 +36,20 @@ class EmbeddingsFactory(BaseModelFactory):
 
 embedding_model = EmbeddingsFactory().new()
 
+class SummaryModelFactory(BaseModelFactory):
+    def new(self) -> BaseChatModel:
+        return init_chat_model(
+            model=agent_config["summary_model_name"],
+            model_provider=agent_config["chat_model_provider"],
+            base_url=env.DASHSCOPE_BASE_URL,
+            api_key=env.DASHSCOPE_API_KEY
+        )
+
+summary_model = SummaryModelFactory().new()
+
 from app.agent.tools.tool import web_search,search_paper_knowledge,get_paper_chunk_context
 from app.utils.prompt_loader import load_system_prompts
-from app.agent.tools.middleware import monitor_tool, monitor_before_model
+from app.agent.tools.middleware import monitor_tool, monitor_before_model, summarize_middleware
 
 class ReActAgentFactory:
     @staticmethod
@@ -47,7 +58,7 @@ class ReActAgentFactory:
             model=chat_model,
             system_prompt=load_system_prompts(),
             tools=[web_search, search_paper_knowledge, get_paper_chunk_context],
-            middleware=[monitor_tool, monitor_before_model],
+            middleware=[monitor_tool, monitor_before_model, summarize_middleware],
             checkpointer=checkpointer,
         )
 

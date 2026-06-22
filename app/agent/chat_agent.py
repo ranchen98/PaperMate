@@ -4,7 +4,7 @@ from langchain_core.messages import HumanMessage, AIMessageChunk
 from langchain_core.runnables import RunnableConfig
 
 from app.business.chat_request import ChatRequest
-from app.core.factory import react_agent
+from app.agent.model.factory import react_agent
 from app.utils.logger_handler import logger
 
 

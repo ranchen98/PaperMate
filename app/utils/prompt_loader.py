@@ -22,3 +22,6 @@ def load_rag_summarize_prompt():
 
 def load_report_prompt():
     return _load_prompt("report_prompt_path")
+
+def load_summary_prompt():
+    return _load_prompt("summary_prompt_path")

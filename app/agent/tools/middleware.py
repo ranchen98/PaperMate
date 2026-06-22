@@ -2,14 +2,16 @@ from typing import Callable
 
 from langchain.agents import AgentState
 from langchain.agents.middleware import wrap_tool_call, before_model, ModelRequest, dynamic_prompt
-from langchain_core.messages import ToolMessage
+from langchain.agents.middleware.summarization import SummarizationMiddleware
+from langchain_core.messages import AnyMessage, ToolMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.runtime import Runtime
 from langgraph.types import Command
 
+from app.agent.model.factory import summary_model
 from app.utils.logger_handler import logger
 from app.utils.prompt_loader import load_report_prompt, load_system_prompts
-
+from app.utils.prompt_loader import load_summary_prompt
 
 #工具调用监控
 @wrap_tool_call
@@ -47,3 +49,35 @@ def prompt_switch(request: ModelRequest):
     if is_report:
         return load_report_prompt()
     return load_system_prompts()
+
+
+#带日志记录的总结中间件
+class LoggingSummarizationMiddleware(SummarizationMiddleware):
+    """在触发总结时记录是否执行总结及压缩的消息数，失败时记录原因。"""
+    def _create_summary(self, messages_to_summarize: list[AnyMessage]) -> str:
+        summary = super()._create_summary(messages_to_summarize)
+        self._log_summary(len(messages_to_summarize), summary)
+        return summary
+
+    async def _acreate_summary(self, messages_to_summarize: list[AnyMessage]) -> str:
+        summary = await super()._acreate_summary(messages_to_summarize)
+        self._log_summary(len(messages_to_summarize), summary)
+        return summary
+
+    @staticmethod
+    def _log_summary(msg_count: int, summary: str) -> None:
+        if summary.startswith("Error generating summary:"):
+            logger.error(f"[Summarization] 总结失败，原消息数:{msg_count} 原因:{summary}")
+        else:
+            logger.info(f"[Summarization] 触发总结，压缩 {msg_count} 条消息")
+
+summarize_middleware = LoggingSummarizationMiddleware(
+    model=summary_model,
+    trigger=[
+        ("tokens", 12000),   # 主触发：约容纳 3-5 轮工具调用周期
+        ("messages", 30),    # 兜底：防止短消息堆积
+    ],
+    keep=("messages", 10),   # 保留最近 10 条 ≈ 5 个工具调用对 + 最新用户指令
+    trim_tokens_to_summarize=6000,  # 默认 4000 偏小，学术内容信息密度高
+    summary_prompt=load_summary_prompt(),
+)
