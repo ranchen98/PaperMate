@@ -4,6 +4,7 @@
 resources/checkpoint/
 resources/chroma/
 resources/data/
+resources/db/
 log/
 __pycache__/
 .venv/
