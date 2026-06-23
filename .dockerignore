@@ -1,0 +1,33 @@
+# Git
+.git/
+.gitignore
+
+# IDE
+.idea/
+
+# Python
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.python-version
+
+# Env (injected at runtime via compose env_file)
+.env
+.env.example
+
+# Runtime data (mounted as volume, not baked into image)
+log/
+resources/
+
+# Frontend (separate build context)
+frontend/
+
+# LangGraph dev-server config (not needed for uvicorn)
+langgraph.json
+
+# Docker self
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml

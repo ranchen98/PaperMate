@@ -14,11 +14,12 @@ def get_project_root() -> str:
     project_root = os.path.dirname(app_dir)
     return project_root
 
-def get_abs_path(relative_path: str) -> str:
+def get_abs_path(*parts: str) -> str:
     """
-    传入相对路径，返回绝对路径
-    :param relative_path: 相对路径
-    :return: 绝对路径
+    传入相对路径分段，返回绝对路径。跨平台兼容 Windows 反斜杠。
+    :param parts: 相对路径分段，例如 ("resources", "db")；也兼容传入 "resources\\db" 这种单段写法
+    :return: 绝对路径(str)
     """
     project_root = get_project_root()
-    return os.path.join(project_root, relative_path)
+    normalized = [p.replace("\\", "/") for p in parts]
+    return os.path.join(project_root, *normalized)

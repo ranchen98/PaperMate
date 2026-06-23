@@ -2,7 +2,7 @@ import sqlite3
 import os
 from app.utils.path_tool import get_abs_path
 
-DB_DIR = get_abs_path("resources\\db")
+DB_DIR = get_abs_path("resources", "db")
 os.makedirs(DB_DIR, exist_ok=True)
 
 DB_PATH = os.path.join(DB_DIR, "papermate.db")
