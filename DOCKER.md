@@ -1,6 +1,6 @@
 # Docker 日常操作指南
 
-所有命令在项目根目录 `D:\pc-workspace\PaperMate` 下执行，需先启动 Docker Desktop。
+所有命令在项目根目录 `\PaperMate` 下执行，需先启动 Docker Desktop。
 
 ## 前置要求
 
