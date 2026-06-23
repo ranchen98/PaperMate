@@ -18,11 +18,10 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
-COPY main.py ./
 COPY app/ ./app/
 COPY config/ ./config/
 COPY prompts/ ./prompts/
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "mkdir -p /app/resources/db /app/resources/checkpoint /app/resources/chroma /app/resources/data && exec uv run --no-sync uvicorn main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "mkdir -p /app/resources/db /app/resources/checkpoint /app/resources/chroma /app/resources/data && exec uv run --no-sync uvicorn app.main:app --host 0.0.0.0 --port 8000"]
