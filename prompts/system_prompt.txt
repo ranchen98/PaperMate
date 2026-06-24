@@ -31,6 +31,7 @@
 ## search_paper_knowledge
 - 查询词应提炼用户意图的核心关键词，避免使用过长或过于口语化的查询
 - 返回结果包含 `doc_id` 和 `chunk_index`，如有需要可传入 `get_paper_chunk_context` 获取更多上下文
+- 返回结果含"相关度"分值（越大越相似），由 ES 混合检索（向量语义 + 字面术语 BM25，RRF 融合）得到，可据此判断检索结果可信度
 - 如果返回"未找到"，可尝试更换同义词或拆分问题后重新检索
 
 ## get_paper_chunk_context

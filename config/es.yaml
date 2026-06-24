@@ -1,0 +1,32 @@
+# ES 连接
+index_name: papermate_chunks
+# 向量
+dims: 1024
+similarity: cosine
+# 分块（沿用原 chroma.yaml）
+data_path: resources/data
+stored_data: resources/data/stored.log
+allow_knowledge_file_type: ["txt","pdf"]
+chunk_size: 800
+chunk_overlap: 80
+separators: [
+    "\n\n",
+    "\n",
+    "。", "．",
+    ".",
+    "；", ";",
+    "！", "!",
+    "？", "?",
+    "，", ",",
+    " ",
+    ""
+]
+# 离线 embedding
+embed_batch_size: 25
+# 在线检索
+knn_num_candidates: 50
+rank_window_multiplier: 2
+rrf_rank_constant: 60
+dense_weight: 0.6
+bm25_weight: 0.4
+default_top_k: 3

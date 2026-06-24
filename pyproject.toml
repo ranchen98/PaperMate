@@ -12,7 +12,6 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "pydantic-settings>=2.14.1",
     "langchain-community>=0.4.2",
-    "langchain-chroma>=1.1.0",
     "dashscope>=1.25.21",
     "pyyaml>=6.0",
     "pydantic>=2.7.0",
@@ -20,6 +19,7 @@ dependencies = [
     "langgraph>=1.0.0",
     "pypdf>=6.13.2",
     "langchain-openai>=1.2.2",
+    "elasticsearch>=8.13,<9",
 ]
 
 [[tool.uv.index]]

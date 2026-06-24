@@ -1,10 +1,8 @@
-from typing import Optional
-
 from langchain.tools import tool
 from langchain_tavily import TavilySearch
 
 from app.business.search_knowledge_input import SearchPaperKnowledgeInput, GetPaperChunkContextInput
-from app.services.vector_store_service import vector_store_service
+from app.services.es_service import es_service
 from app.utils.config_handler import agent_config, env
 
 tavily_search = TavilySearch(
@@ -29,32 +27,27 @@ def web_search(query: str, max_results: int = 3) -> str:
     return tavily_search.invoke(query)
 
 @tool("search_paper_knowledge", args_schema=SearchPaperKnowledgeInput)
-def search_paper_knowledge(query: str, topic: Optional[str] = None, top_k: int = 3) -> str:
+def search_paper_knowledge(query: str, top_k: int = 3) -> str:
     """
-    检索向量数据库中存储的论文相关知识，返回与用户提问匹配的论文片段及来源信息。
+    检索知识库中存储的论文相关知识，返回与用户提问匹配的论文片段及来源信息。
     【适用场景】用户询问论文中的概念、方法、结论、实验细节等学术知识时使用。
     【不适用场景】用户询问的内容与论文无关（如闲聊、常识问题、实时新闻等）时不适用。
+    【返回说明】采用ES混合检索（向量语义+字面术语BM25，RRF融合），每个片段含"相关度"分值（越大越相似）。
     """
-    search_kwargs = {}
-    if topic:
-        search_kwargs["filter"] = {"topic": topic}
-    search_kwargs["k"] = top_k
-    retriever = vector_store_service.gt_retriever(search_kwargs=search_kwargs)
+    docs_with_scores = es_service.hybrid_search(query, top_k=top_k)
 
-    docs = retriever.invoke(query)
-
-    if not docs:
+    if not docs_with_scores:
         return f"未在知识库中找到与 '{query}' 相关的信息。建议：1. 尝试更换同义词重新搜索；2. 告知用户知识库中暂无此内容。"
 
     formatted_results = []
-    for i, doc in enumerate(docs):
+    for i, (doc, score) in enumerate(docs_with_scores):
         source = doc.metadata.get("source", "未知来源")
         page = doc.metadata.get("page", "")
         doc_id = doc.metadata.get("doc_id", "")
         chunk_index = doc.metadata.get("chunk_index", "")
         content = doc.page_content[:800]
         formatted_results.append(
-            f"[片段 {i + 1}] 来源: {source} (第{page}页) | doc_id: {doc_id}, chunk_index: {chunk_index}\n内容: {content}"
+            f"[片段 {i + 1}] 相关度={score:.4f}(越大越相似) 来源: {source} (第{page}页) | doc_id: {doc_id}, chunk_index: {chunk_index}\n内容: {content}"
         )
 
     return "\n\n---\n\n".join(formatted_results)
@@ -67,7 +60,7 @@ def get_paper_chunk_context(doc_id: str, chunk_index: int, window_size: int = 3,
     【不适用场景】检索结果已经完整回答了问题时不应使用。
     【使用方式】从检索结果中获取doc_id和chunk_index，传入本工具即可获取相邻片段。
     """
-    chunks = vector_store_service.get_chunks_by_doc_id(doc_id)
+    chunks = es_service.get_chunks_by_doc_id(doc_id)
 
     if not chunks:
         return f"未找到文档 {doc_id} 的任何片段。请确认doc_id是否正确，或该文档可能尚未入库。"

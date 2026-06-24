@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     DASHSCOPE_API_KEY: str
     DASHSCOPE_BASE_URL: str
     TAVILY_API_KEY: str
+    ES_HOST: str = "http://localhost:9200"
+    ES_PORT: str = "9200"
 
 env = Settings()
 
@@ -19,4 +21,4 @@ def _load_yaml_config(config_path: str):
 
 agent_config = _load_yaml_config(get_abs_path("config/agent.yaml"))
 prompt_config = _load_yaml_config(get_abs_path("config/prompt.yaml"))
-chroma_config = _load_yaml_config(get_abs_path("config/chroma.yaml"))
+es_config = _load_yaml_config(get_abs_path("config/es.yaml"))

@@ -5,14 +5,39 @@ from typing import Optional
 from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
 from langchain_community.embeddings import DashScopeEmbeddings
+from langchain_community.embeddings.dashscope import embed_with_retry
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
 from langgraph.graph.state import CompiledStateGraph
 
 from app.utils.checkpointer_handler import checkpointer
-from app.utils.config_handler import agent_config, env
+from app.utils.config_handler import agent_config, env, es_config
 
 warnings.filterwarnings("ignore", message="`langchain-community` is being sunset")
+
+
+class DashScopeEmbeddingsWithDims(DashScopeEmbeddings):
+    """DashScopeEmbeddings 子类，显式指定输出向量维度，确保与 ES dense_vector.dims 一致。"""
+
+    def embed_documents(self, texts):
+        embeddings = embed_with_retry(
+            self,
+            input=texts,
+            text_type="document",
+            model=self.model,
+            dimension=es_config["dims"],
+        )
+        return [item["embedding"] for item in embeddings]
+
+    def embed_query(self, text):
+        embedding = embed_with_retry(
+            self,
+            input=text,
+            text_type="query",
+            model=self.model,
+            dimension=es_config["dims"],
+        )[0]["embedding"]
+        return embedding
 
 class BaseModelFactory(ABC):
     @abstractmethod
@@ -32,7 +57,10 @@ chat_model = ChatModelFactory().new()
 
 class EmbeddingsFactory(BaseModelFactory):
     def new(self) -> Embeddings:
-        return DashScopeEmbeddings(model=agent_config["embedding_model_name"], dashscope_api_key=env.DASHSCOPE_API_KEY)
+        return DashScopeEmbeddingsWithDims(
+            model=agent_config["embedding_model_name"],
+            dashscope_api_key=env.DASHSCOPE_API_KEY,
+        )
 
 embedding_model = EmbeddingsFactory().new()
 

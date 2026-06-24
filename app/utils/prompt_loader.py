@@ -17,9 +17,6 @@ def _load_prompt(config_key: str):
 def load_system_prompts():
     return _load_prompt("system_prompt_path")
 
-def load_rag_summarize_prompt():
-    return _load_prompt("rag_summarize_prompt_path")
-
 def load_report_prompt():
     return _load_prompt("report_prompt_path")
 

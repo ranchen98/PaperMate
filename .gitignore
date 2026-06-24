@@ -1,4 +1,5 @@
 .env
+PROJECT_REPORT.md
 .idea/
 .langgraph_api/
 resources/*/

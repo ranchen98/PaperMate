@@ -1,5 +1,5 @@
 chat_model_name: qwen3.6-plus
 chat_model_provider: openai
-embedding_model_name: text-embedding-v4
+embedding_model_name: text-embedding-v3
 summary_model_name: qwen-turbo
 web_search_max_results: 3
