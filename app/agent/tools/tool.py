@@ -27,7 +27,7 @@ def web_search(query: str, max_results: int = 3) -> str:
     return tavily_search.invoke(query)
 
 @tool("search_paper_knowledge", args_schema=SearchPaperKnowledgeInput)
-def search_paper_knowledge(query: str, top_k: int = 3) -> str:
+def search_paper_knowledge(query: str, top_k: int = 5) -> str:
     """
     检索知识库中存储的论文相关知识，返回与用户提问匹配的论文片段及来源信息。
     【适用场景】用户询问论文中的概念、方法、结论、实验细节等学术知识时使用。
@@ -52,7 +52,7 @@ def search_paper_knowledge(query: str, top_k: int = 3) -> str:
     return "\n\n---\n\n".join(formatted_results)
 
 @tool("get_paper_chunk_context", args_schema=GetPaperChunkContextInput)
-def get_paper_chunk_context(file_id: str, chunk_index: int, window_size: int = 3, max_chars: int = 5000) -> str:
+def get_paper_chunk_context(file_id: str, chunk_index: int, window_size: int = 3, max_chars: int = 10000) -> str:
     """
     当检索到的论文片段信息不完整、需要更多上下文时，获取指定片段的前后相邻片段。
     【适用场景】检索结果中的片段信息不够，需要了解前文或后文内容时使用。

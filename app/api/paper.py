@@ -2,6 +2,7 @@ import threading
 
 from fastapi import APIRouter, File, Form, UploadFile
 
+from app.services.es_service import es_service
 from app.services.paper_analysis_service import paper_analysis_service
 from app.services.paper_store_service import paper_store_service
 from app.utils.logger_handler import logger
@@ -46,6 +47,7 @@ def _run_paper_to_md(file_ids: list[str]) -> None:
             f"[upload]后台解析完成: {len(result.succeeded)} 成功, "
             f"{len(result.failed)} 失败, timed_out={result.timed_out}"
         )
+        es_service.load_document()
     except Exception as e:
         logger.error(f"[upload]后台解析异常: {str(e)}", exc_info=True)
 
