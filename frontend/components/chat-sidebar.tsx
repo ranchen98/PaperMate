@@ -1,20 +1,24 @@
 "use client";
 
-import { Plus, MessageSquare, Trash2, X } from "lucide-react";
+import { Plus, MessageSquare, Trash2, X, Library } from "lucide-react";
 import { cn, formatTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
 import type { Thread } from "@/lib/types";
+
+export type SidebarView = "chat" | "knowledge";
 
 type ChatSidebarProps = {
   threads: Thread[];
   currentThreadId: string | null;
   isLoading: boolean;
   isOpen: boolean;
+  view: SidebarView;
   onClose: () => void;
   onNewThread: () => void;
   onSelectThread: (threadId: string) => void;
   onDeleteThread: (threadId: string) => void;
+  onSelectView: (view: SidebarView) => void;
 };
 
 export function ChatSidebar({
@@ -22,10 +26,12 @@ export function ChatSidebar({
   currentThreadId,
   isLoading,
   isOpen,
+  view,
   onClose,
   onNewThread,
   onSelectThread,
   onDeleteThread,
+  onSelectView,
 }: ChatSidebarProps) {
   return (
     <>
@@ -69,6 +75,34 @@ export function ChatSidebar({
             <Plus className="size-4" />
             新建对话
           </Button>
+        </div>
+
+        <div className="px-3 pb-2">
+          <div
+            className={cn(
+              "group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 transition-colors",
+              view === "knowledge"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "hover:bg-sidebar-accent/60",
+            )}
+            onClick={() => onSelectView("knowledge")}
+          >
+            <Library
+              className={cn(
+                "size-4 shrink-0",
+                view === "knowledge"
+                  ? "text-sidebar-accent-foreground"
+                  : "text-muted-foreground",
+              )}
+            />
+            <span className="text-sm font-medium">知识库</span>
+          </div>
+        </div>
+
+        <div className="border-t px-3 py-2">
+          <span className="px-3 text-xs font-medium text-muted-foreground">
+            对话列表
+          </span>
         </div>
 
         <div className="flex-1 overflow-y-auto px-2 pb-3">

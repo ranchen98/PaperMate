@@ -1,7 +1,7 @@
 services:
   elasticsearch:
     build:
-      context: ./docker
+      context: ./infra
       dockerfile: es.Dockerfile
     image: papermate-elasticsearch:latest
     environment:

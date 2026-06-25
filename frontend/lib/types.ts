@@ -36,6 +36,17 @@ export type StreamEvent =
 
 export type ThreadListResponse = Thread[];
 
+export type PaperFile = {
+  file_id: string;
+  user_id: string;
+  file_name: string;
+  file_path: string;
+  md5: string;
+  topic: string;
+  upload_time: string;
+  update_time: string;
+};
+
 export const DEFAULT_USER_ID = "default_user";
 
 export function generateThreadId(): string {

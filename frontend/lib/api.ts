@@ -1,6 +1,7 @@
 import type {
   ChatRequest,
   HistoryResponse,
+  PaperFile,
   StreamEvent,
   ThreadListResponse,
 } from "@/lib/types";
@@ -29,6 +30,40 @@ export async function deleteThread(threadId: string): Promise<void> {
   await getJson(
     `/chat/delete_session?thread_id=${encodeURIComponent(threadId)}`,
   );
+}
+
+export async function fetchPapers(userId: string): Promise<PaperFile[]> {
+  return getJson<PaperFile[]>(
+    `/paper/files?user_id=${encodeURIComponent(userId)}`,
+  );
+}
+
+export async function uploadPapers(
+  files: File[],
+  userId: string,
+  topic: string = "",
+): Promise<PaperFile[]> {
+  const form = new FormData();
+  for (const file of files) {
+    form.append("files", file);
+  }
+  form.append("user_id", userId);
+  form.append("topic", topic);
+
+  const res = await fetch("/paper/upload", { method: "POST", body: form });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  const body = await res.json();
+  if (body.code !== 200) throw new Error(body.message || `业务错误 ${body.code}`);
+  return body.data as PaperFile[];
+}
+
+export async function deletePaper(fileId: string): Promise<void> {
+  const res = await fetch(`/paper/files/${encodeURIComponent(fileId)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  const body = await res.json();
+  if (body.code !== 200) throw new Error(body.message || `业务错误 ${body.code}`);
 }
 
 export async function* streamChat(

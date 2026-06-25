@@ -16,6 +16,9 @@ __pycache__/
 .env
 .env.example
 
+# Local-only reference docs
+docs/
+
 # Runtime data (mounted as volume, not baked into image)
 log/
 resources/

@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     TAVILY_API_KEY: str
     ES_HOST: str = "http://localhost:9200"
     ES_PORT: str = "9200"
+    MINERU_URL: str
+    MINERU_TOKEN: str
 
 env = Settings()
 

@@ -1,4 +1,4 @@
-# Docker 日常操作指南
+docker# Docker 日常操作指南
 
 所有命令在项目根目录 `\PaperMate` 下执行，需先启动 Docker Desktop。
 
@@ -7,6 +7,7 @@
 - Docker Desktop 已运行（守护进程已启动）
 - `.env` 文件已按 `.env.example` 配置好 API Key
 - `resources/` 目录存在（首次运行容器会自动创建子目录 `db/`、`checkpoint/`、`chroma/`、`data/`）
+- docker login --username=akirarc crpi-uaipq0xxk47hfqee.cn-hangzhou.personal.cr.aliyuncs.com
 
 ## 启停
 

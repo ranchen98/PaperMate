@@ -5,10 +5,12 @@ dims: 1024
 similarity: cosine
 # 分块（沿用原 chroma.yaml）
 data_path: resources/data
-stored_data: resources/data/stored.log
+md_file_path: resources/data/md
 allow_knowledge_file_type: ["txt","pdf"]
+max_file_size_mb: 50
 chunk_size: 800
 chunk_overlap: 80
+md_headers_to_split_on: [["##", "section"], ["###", "subsection"]]
 separators: [
     "\n\n",
     "\n",

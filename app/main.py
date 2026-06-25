@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from app.api.chat import router as chat_router
+from app.api.paper import router as paper_router
 from app.business.exceptions import BusinessException
 from app.utils.exception_handler import business_exception_handler, global_exception_handler
 
@@ -9,6 +10,7 @@ app.add_exception_handler(BusinessException, business_exception_handler)
 app.add_exception_handler(Exception, global_exception_handler)
 
 app.include_router(chat_router)
+app.include_router(paper_router)
 
 
 @app.get("/")

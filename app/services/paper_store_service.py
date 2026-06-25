@@ -1,0 +1,160 @@
+import os
+import shutil
+import uuid
+
+from fastapi import UploadFile
+
+from app.business.exceptions import BusinessException
+from app.business.paper_file import PaperFile
+from app.utils.config_handler import es_config
+from app.utils.db_handler import db_connection
+from app.utils.file_handler import get_bytes_md5_hex
+from app.utils.logger_handler import logger
+from app.utils.path_tool import get_abs_path
+
+DATA_DIR = get_abs_path("resources", "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+
+MD_DIR = get_abs_path(es_config["md_file_path"])
+MD_ZIP_DIR = os.path.join(MD_DIR, "zip")
+
+ALLOWED_TYPES = tuple(es_config["allow_knowledge_file_type"])
+MAX_FILE_SIZE = es_config["max_file_size_mb"] * 1024 * 1024
+
+
+def _row_to_paper_file(row) -> PaperFile:
+    return PaperFile(
+        file_id=row["file_id"],
+        user_id=row["user_id"],
+        file_name=row["file_name"],
+        file_path=row["file_path"],
+        md5=row["md5"],
+        topic=row["topic"] or "",
+        upload_time=(row["upload_time"].replace(" ", "T") + "Z") if row["upload_time"] else "",
+        update_time=(row["update_time"].replace(" ", "T") + "Z") if row["update_time"] else "",
+    )
+
+
+class PaperStoreService:
+    async def save_files(
+        self, files: list[UploadFile], user_id: str, topic: str,
+    ) -> tuple[list[PaperFile], list[str]]:
+        """落盘并记录到 SQLite，按 MD5 全局去重。
+
+        返回 (records, new_file_ids)：
+        - records: 所有 file 的 PaperFile 记录（含幂等命中的已有记录）
+        - new_file_ids: 本次新写入的 file_id 列表（不含幂等命中）
+        """
+        records: list[PaperFile] = []
+        new_file_ids: list[str] = []
+        for file in files:
+            record, is_new = await self._save_one(file, user_id, topic)
+            records.append(record)
+            if is_new:
+                new_file_ids.append(record.file_id)
+        return records, new_file_ids
+
+    async def _save_one(
+        self, file: UploadFile, user_id: str, topic: str,
+    ) -> tuple[PaperFile, bool]:
+        """落盘单个文件。返回 (PaperFile, is_new)；幂等命中时 is_new=False。"""
+        file_name = file.filename or ""
+        ext = self._get_extension(file_name)
+
+        content = await file.read()
+        if not content:
+            raise BusinessException(400, f"文件 {file_name} 为空")
+        if len(content) > MAX_FILE_SIZE:
+            raise BusinessException(400, f"文件 {file_name} 大小超过 {es_config['max_file_size_mb']}MB 限制")
+
+        md5 = get_bytes_md5_hex(content)
+        if not md5:
+            raise BusinessException(500, f"文件 {file_name} MD5 计算失败")
+
+        existing = self._find_by_md5(md5)
+        if existing is not None:
+            logger.info(f"[save_files]文件 {file_name} 与已有记录 md5={md5} 重复，跳过落盘")
+            return existing, False
+
+        file_id = uuid.uuid4().hex
+        rel_path = f"resources/data/{file_id}{ext}"
+        abs_path = get_abs_path(rel_path)
+        with open(abs_path, "wb") as f:
+            f.write(content)
+
+        cursor = db_connection.cursor()
+        cursor.execute(
+            "INSERT INTO paper_file (file_id, user_id, file_name, file_path, md5, topic) VALUES (?, ?, ?, ?, ?, ?)",
+            (file_id, user_id, file_name, rel_path, md5, topic),
+        )
+        db_connection.commit()
+        logger.info(f"[save_files]文件 {file_name} 上传成功 file_id={file_id}")
+
+        cursor.execute("SELECT * FROM paper_file WHERE file_id = ?", (file_id,))
+        return _row_to_paper_file(cursor.fetchone()), True
+
+    def _get_extension(self, file_name: str) -> str:
+        _, ext = os.path.splitext(file_name)
+        ext = ext.lower().lstrip(".")
+        if not ext:
+            raise BusinessException(400, f"文件 {file_name} 缺少扩展名")
+        if ext not in ALLOWED_TYPES:
+            raise BusinessException(400, f"文件 {file_name} 类型 .{ext} 不被支持，仅允许 {list(ALLOWED_TYPES)}")
+        return f".{ext}"
+
+    def _find_by_md5(self, md5: str):
+        cursor = db_connection.cursor()
+        cursor.execute("SELECT * FROM paper_file WHERE md5 = ?", (md5,))
+        row = cursor.fetchone()
+        return _row_to_paper_file(row) if row is not None else None
+
+    def delete_file(self, file_id: str) -> None:
+        cursor = db_connection.cursor()
+        cursor.execute(
+            "SELECT file_path, zip_file_name, is_md_parsed FROM paper_file WHERE file_id = ?",
+            (file_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            raise BusinessException(404, f"文件 {file_id} 不存在")
+
+        self._safe_remove(get_abs_path(row["file_path"]), "原始文件")
+        if row["zip_file_name"]:
+            self._safe_remove(os.path.join(MD_ZIP_DIR, row["zip_file_name"]), "zip 文件")
+        if row["is_md_parsed"]:
+            self._safe_rmtree(os.path.join(MD_DIR, file_id), "md 文件夹")
+
+        cursor.execute("DELETE FROM paper_file WHERE file_id = ?", (file_id,))
+        db_connection.commit()
+        logger.info(f"[delete_file]文件记录已删除 file_id={file_id}")
+
+    @staticmethod
+    def _safe_remove(abs_path: str, label: str) -> None:
+        """安全删除文件：不存在则 warn，其他异常 log，均不抛出。"""
+        try:
+            os.remove(abs_path)
+        except FileNotFoundError:
+            logger.warning(f"[delete_file]{label}已不存在: {abs_path}")
+        except Exception as e:
+            logger.error(f"[delete_file]删除{label}失败: {abs_path} {str(e)}")
+
+    @staticmethod
+    def _safe_rmtree(abs_path: str, label: str) -> None:
+        """安全删除目录：不存在则 warn，其他异常 log，均不抛出。"""
+        try:
+            shutil.rmtree(abs_path)
+        except FileNotFoundError:
+            logger.warning(f"[delete_file]{label}已不存在: {abs_path}")
+        except Exception as e:
+            logger.error(f"[delete_file]删除{label}失败: {abs_path} {str(e)}")
+
+    def list_files(self, user_id: str) -> list[PaperFile]:
+        cursor = db_connection.cursor()
+        cursor.execute(
+            "SELECT * FROM paper_file WHERE user_id = ? ORDER BY upload_time DESC",
+            (user_id,),
+        )
+        return [_row_to_paper_file(row) for row in cursor.fetchall()]
+
+
+paper_store_service = PaperStoreService()

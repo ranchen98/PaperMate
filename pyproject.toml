@@ -20,6 +20,8 @@ dependencies = [
     "pypdf>=6.13.2",
     "langchain-openai>=1.2.2",
     "elasticsearch>=8.13,<9",
+    "python-multipart>=0.0.18",
+    "requests>=2.32",
 ]
 
 [[tool.uv.index]]

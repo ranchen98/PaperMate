@@ -1,13 +1,10 @@
 import hashlib
 import os
-import warnings
 
 from langchain_core.documents import Document
 
 from app.utils.logger_handler import logger
 
-warnings.filterwarnings("ignore", message="`langchain-community` is being sunset")
-from langchain_community.document_loaders import PyPDFLoader, TextLoader  # noqa: E402
 
 def get_file_md5_hex(file_path: str):
     if not os.path.exists(file_path):
@@ -29,17 +26,22 @@ def get_file_md5_hex(file_path: str):
     except Exception as e:
         logger.error(f"[get_file_md5_hex]计算文件{file_path}md5失败: {str(e)}")
 
-def listdir_with_allowed_type(dir_path: str, allowed_types: tuple[str]):
-    files = []
-    if not os.path.isdir(dir_path):
-        logger.error(f"[listdir_with_allowed_type]{dir_path}不是有效文件夹")
-    for f in os.listdir(dir_path):
-        if f.endswith(allowed_types):
-            files.append(os.path.join(dir_path, f))
-    return tuple(files)
+def get_bytes_md5_hex(data: bytes) -> str:
+    try:
+        return hashlib.md5(data).hexdigest()
+    except Exception as e:
+        logger.error(f"[get_bytes_md5_hex]计算字节流md5失败: {str(e)}")
+        return ""
 
-def pdf_loader(file_path: str, password = None) -> list[Document]:
-    return PyPDFLoader(file_path, password).load()
-
-def txt_loader(file_path: str) -> list[Document]:
-    return TextLoader(file_path, encoding="utf-8").load()
+def md_loader(file_path: str) -> list[Document]:
+    """读取 Markdown 文件，返回单个 Document（无分块，分块由调用方处理）。"""
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            text = f.read()
+        if not text.strip():
+            logger.warning(f"[md_loader]{file_path} 内容为空")
+            return []
+        return [Document(page_content=text, metadata={})]
+    except Exception as e:
+        logger.error(f"[md_loader]读取 {file_path} 失败: {str(e)}")
+        return []
