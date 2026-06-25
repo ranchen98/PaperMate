@@ -160,48 +160,40 @@ class EsService:
             return []
 
         fetch_k = max(top_k * es_config["rank_window_multiplier"], top_k)
-        body = {
-            "retrieval": {
-                "rrf": {
-                    "retrievers": [
-                        {
-                            "standard": {
-                                "query": {
-                                    "multi_match": {
-                                        "query": query,
-                                        "fields": ["content", "content.english"],
-                                    }
-                                }
-                            },
-                            "weight": es_config["bm25_weight"],
-                        },
-                        {
-                            "knn": {
-                                "field": "embedding",
-                                "query_vector": query_vector,
-                                "k": fetch_k,
-                                "num_candidates": es_config["knn_num_candidates"],
-                            },
-                            "weight": es_config["dense_weight"],
-                        },
-                    ],
-                    "rank_window_size": fetch_k,
-                    "rank_constant": es_config["rrf_rank_constant"],
+        rrf_k = es_config["rrf_rank_constant"]
+        dense_weight = es_config["dense_weight"]
+        bm25_weight = es_config["bm25_weight"]
+
+        # BM25 路（倒排检索）
+        bm25_body = {
+            "query": {
+                "multi_match": {
+                    "query": query,
+                    "fields": ["content", "content.english"],
                 }
             },
-            "size": top_k,
+            "size": fetch_k,
+        }
+        # kNN 向量路
+        knn_body = {
+            "knn": {
+                "field": "embedding",
+                "query_vector": query_vector,
+                "k": fetch_k,
+                "num_candidates": es_config["knn_num_candidates"],
+            },
+            "size": fetch_k,
         }
 
         try:
-            resp = self.es.search(index=self.index, body=body)
+            bm25_resp = self.es.search(index=self.index, body=bm25_body)
+            knn_resp = self.es.search(index=self.index, body=knn_body)
         except Exception as e:
             logger.error(f"[ES检索]hybrid_search 失败：{str(e)}", exc_info=True)
             return []
 
-        results: list[tuple[Document, float]] = []
-        for hit in resp["hits"]["hits"]:
-            src = hit["_source"]
-            doc = Document(
+        def _to_doc(src):
+            return Document(
                 page_content=src["content"],
                 metadata={
                     "doc_id": src["doc_id"],
@@ -210,8 +202,26 @@ class EsService:
                     "page": src["page"],
                 },
             )
-            results.append((doc, float(hit["_score"])))
-        return results
+
+        def _key(src):
+            return f"{src['doc_id']}_{src['chunk_index']}"
+
+        fusion: dict[str, dict] = {}
+        for rank, hit in enumerate(bm25_resp["hits"]["hits"]):
+            src = hit["_source"]
+            k = _key(src)
+            if k not in fusion:
+                fusion[k] = {"doc": _to_doc(src), "score": 0.0}
+            fusion[k]["score"] += bm25_weight / (rrf_k + rank + 1)
+        for rank, hit in enumerate(knn_resp["hits"]["hits"]):
+            src = hit["_source"]
+            k = _key(src)
+            if k not in fusion:
+                fusion[k] = {"doc": _to_doc(src), "score": 0.0}
+            fusion[k]["score"] += dense_weight / (rrf_k + rank + 1)
+
+        ranked = sorted(fusion.values(), key=lambda x: x["score"], reverse=True)
+        return [(item["doc"], item["score"]) for item in ranked[:top_k]]
 
     def get_chunks_by_doc_id(self, doc_id: str) -> list[dict]:
         try:

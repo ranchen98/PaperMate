@@ -6,7 +6,8 @@ CHECKPOINT_PATH = get_abs_path("resources", "checkpoint")
 os.makedirs(CHECKPOINT_PATH, exist_ok=True)
 
 def _create_checkpointer():
-    connection = sqlite3.connect(os.path.join(CHECKPOINT_PATH, "checkpint.db"), check_same_thread=False)
+    connection = sqlite3.connect(os.path.join(CHECKPOINT_PATH, "checkpoint.db"), check_same_thread=False)
+    connection.execute("PRAGMA journal_mode=DELETE")
     checkpointer = SqliteSaver(connection)
     checkpointer.setup()
     return checkpointer
