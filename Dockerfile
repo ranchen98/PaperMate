@@ -1,5 +1,5 @@
-ARG PYTHON_IMAGE=python:3.13-slim
-ARG PIP_INDEX_URL=https://pypi.org/simple
+ARG PYTHON_IMAGE=registry.cn-hangzhou.aliyuncs.com/library/python:3.13-slim
+ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple
 
 FROM ${PYTHON_IMAGE} AS builder
 ARG PIP_INDEX_URL

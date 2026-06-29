@@ -1,5 +1,5 @@
-ARG NODE_IMAGE=node:20-alpine
-ARG NPM_REGISTRY=https://registry.npmjs.org
+ARG NODE_IMAGE=registry.cn-hangzhou.aliyuncs.com/library/node:20-alpine
+ARG NPM_REGISTRY=https://registry.npmmirror.com
 FROM ${NODE_IMAGE} AS deps
 ARG NPM_REGISTRY
 WORKDIR /app
