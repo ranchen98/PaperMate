@@ -1,4 +1,5 @@
 .env
+.env.production
 docs/
 .idea/
 .langgraph_api/

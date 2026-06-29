@@ -17,7 +17,10 @@ MD_DIR = get_abs_path(es_config["md_file_path"])
 
 class EsService:
     def __init__(self):
-        self.es = Elasticsearch(env.ES_HOST)
+        kwargs = {}
+        if env.ES_USERNAME:
+            kwargs["basic_auth"] = (env.ES_USERNAME, env.ES_PASSWORD)
+        self.es = Elasticsearch(env.ES_HOST, **kwargs)
         self.index = es_config["index_name"]
         self.splitter = RecursiveCharacterTextSplitter(
             chunk_size=es_config["chunk_size"],
