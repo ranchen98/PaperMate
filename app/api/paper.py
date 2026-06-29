@@ -54,8 +54,9 @@ def _run_paper_to_md(file_ids: list[str]) -> None:
 
 @router.delete("/files/{file_id}")
 async def delete_file(file_id: str):
-    """根据 file_id 删除文件记录及对应物理文件。"""
+    """根据 file_id 删除文件记录及对应物理文件，并清理 ES 索引。"""
     paper_store_service.delete_file(file_id)
+    es_service.delete_document(file_id)
     return {
         "code": 200,
         "message": "success",

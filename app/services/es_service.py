@@ -154,6 +154,19 @@ class EsService:
                 logger.error(f"[加载知识库]{file_name} 加载失败：{str(e)}", exc_info=True)
                 continue
 
+    def delete_document(self, file_id: str) -> None:
+        """删除指定 file_id 在 ES 中的所有分片文档。"""
+        try:
+            self._ensure_index()
+            self.es.delete_by_query(
+                index=self.index,
+                query={"term": {"file_id": file_id}},
+                refresh=True,
+            )
+            logger.info(f"[ES]已删除 file_id={file_id} 的所有分片")
+        except Exception as e:
+            logger.error(f"[ES]删除 file_id={file_id} 失败：{str(e)}", exc_info=True)
+
     def hybrid_search(self, query: str, top_k: int = 3) -> list[tuple[Document, float]]:
         try:
             query_vector = embedding_model.embed_query(query)
