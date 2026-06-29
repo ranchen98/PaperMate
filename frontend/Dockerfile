@@ -1,6 +1,7 @@
 ARG NODE_IMAGE=node:20-alpine
 ARG NPM_REGISTRY=https://registry.npmjs.org
 FROM ${NODE_IMAGE} AS deps
+ARG NPM_REGISTRY
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN echo "registry=${NPM_REGISTRY}" > .npmrc && npm ci

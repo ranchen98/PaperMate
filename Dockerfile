@@ -2,6 +2,7 @@ ARG PYTHON_IMAGE=python:3.13-slim
 ARG PIP_INDEX_URL=https://pypi.org/simple
 
 FROM ${PYTHON_IMAGE} AS builder
+ARG PIP_INDEX_URL
 
 ENV UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
