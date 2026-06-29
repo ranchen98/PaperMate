@@ -1,19 +1,16 @@
-ARG NODE_IMAGE=registry.cn-hangzhou.aliyuncs.com/library/node:20-alpine
-ARG NPM_REGISTRY=https://registry.npmmirror.com
-FROM ${NODE_IMAGE} AS deps
-ARG NPM_REGISTRY
+FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN echo "registry=${NPM_REGISTRY}" > .npmrc && npm ci
+RUN echo "registry=https://registry.npmmirror.com" > .npmrc && npm ci
 
-FROM ${NODE_IMAGE} AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-FROM ${NODE_IMAGE} AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \

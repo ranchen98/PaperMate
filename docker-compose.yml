@@ -3,9 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        PYTHON_IMAGE: registry.cn-hangzhou.aliyuncs.com/library/python:3.13-slim
-        PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple
     image: papermate-backend:latest
     env_file: ${ENV_FILE:-.env}
     volumes:
@@ -16,9 +13,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        NODE_IMAGE: registry.cn-hangzhou.aliyuncs.com/library/node:20-alpine
-        NPM_REGISTRY: https://registry.npmmirror.com
     image: papermate-frontend:latest
     environment:
       - BACKEND_URL=http://backend:8000

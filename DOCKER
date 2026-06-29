@@ -1,5 +1,0 @@
-DEV:
-  docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
-
-PROD:
-  docker compose --env-file .env.production up -d --build
