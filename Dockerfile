@@ -1,9 +1,12 @@
-FROM registry.cn-hangzhou.aliyuncs.com/library/python:3.13-slim AS builder
+ARG PYTHON_IMAGE=python:3.13-slim
+ARG PIP_INDEX_URL=https://pypi.org/simple
+
+FROM ${PYTHON_IMAGE} AS builder
 
 ENV UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
     UV_PYTHON_DOWNLOADS=never \
-    PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple
+    PIP_INDEX_URL=${PIP_INDEX_URL}
 
 WORKDIR /app
 
@@ -13,7 +16,7 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
-FROM registry.cn-hangzhou.aliyuncs.com/library/python:3.13-slim
+FROM ${PYTHON_IMAGE}
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
