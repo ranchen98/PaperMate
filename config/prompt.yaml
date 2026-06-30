@@ -1,2 +1,9 @@
-system_prompt_path: prompts/system_prompt.txt
+# 多 Agent 提示词路径
+system_prompt_path: prompts/system_prompt.txt            # 兼容历史引用（已弃用，保留键以免破坏旧引用）
 summary_prompt_path: prompts/summary_prompt.txt
+
+# 专家 Agent 提示词
+supervisor_prompt_path: prompts/experts/supervisor.txt
+retrieval_prompt_path: prompts/experts/retrieval.txt
+writing_prompt_path: prompts/experts/writing.txt
+review_prompt_path: prompts/experts/review.txt

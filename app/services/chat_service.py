@@ -1,4 +1,4 @@
-from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from app.utils.checkpointer_handler import checkpointer
 from app.utils.db_handler import db_connection
@@ -8,21 +8,71 @@ from app.business.chat_request import ChatRequest
 from app.business.exceptions import BusinessException
 import json
 
+# 多 Agent 超级图中的专家节点名（Supervisor 不对外输出）
+_EXPERT_NODES = ("retrieval", "writing", "review")
+
+
 class ChatService:
     def chat_streaming_response(self, request: ChatRequest):
         try:
             logger.info(f"[chat_streaming_response]: {str(request)}")
             self._ensure_thread_record(request.user_id, request.thread_id, request.message)
-            for chunk, metadata in chat_agent.stream(request):
-                if isinstance(chunk, AIMessageChunk):
+            current_agent: str | None = None
+
+            def _agent_start_event(agent: str) -> str:
+                return f"event: agent_start\ndata: {json.dumps({'agent': agent}, ensure_ascii=False)}\n\n"
+
+            def _agent_end_event(agent: str) -> str:
+                return f"event: agent_end\ndata: {json.dumps({'agent': agent}, ensure_ascii=False)}\n\n"
+
+            for chunk, metadata, namespace in chat_agent.stream(request):
+                # subgraphs=True 格式：(chunk, metadata, namespace)
+                # namespace=() → 父图事件（supervisor / writing / review 函数节点）
+                # namespace=("retrieval:uuid",) → retrieval 子图事件
+                node = metadata.get("langgraph_node") if metadata else None
+
+                # 从 namespace 提取 Agent 名：子图事件 namespace[0] 形如 "retrieval:uuid"
+                if namespace:
+                    ns_name = namespace[0].split(":")[0] if namespace[0] else None
+                    if ns_name in _EXPERT_NODES:
+                        node = ns_name
+
+                # 检测 Agent 切换：先结束上一个专家，再开启新专家
+                if node in _EXPERT_NODES and node != current_agent:
+                    if current_agent is not None:
+                        yield _agent_end_event(current_agent)
+                    current_agent = node
+                    yield _agent_start_event(current_agent)
+
+                if isinstance(chunk, AIMessage):
                     if metadata.get("lc_source") == "summarization":
                         continue
+                    # 隐藏 Supervisor 路由模型的结构化 JSON 输出
+                    if node == "supervisor":
+                        continue
                     if chunk.content:
-                        yield f"data: {json.dumps({'role': 'ai', 'content': chunk.content}, ensure_ascii=False)}\n\n"
+                        # content 可能是 str 或 list[dict]（多模态），统一提取文本
+                        content = chunk.content
+                        if isinstance(content, list):
+                            content = "".join(
+                                b.get("text", "") if isinstance(b, dict) else str(b)
+                                for b in content
+                            )
+                        payload = {"role": "ai", "content": content}
+                        if node in _EXPERT_NODES:
+                            payload["agent"] = node
+                        yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
                 elif isinstance(chunk, ToolMessage):
                     tool_name = chunk.name or ""
                     if tool_name:
-                        yield f"data: {json.dumps({'role': 'tool', 'tool_name': tool_name}, ensure_ascii=False)}\n\n"
+                        payload = {"role": "tool", "tool_name": tool_name}
+                        if node in _EXPERT_NODES:
+                            payload["agent"] = node
+                        yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+            # 流结束：补发最后一个 Agent 的 end 事件
+            if current_agent is not None:
+                yield _agent_end_event(current_agent)
         except Exception as e:
             logger.error(f"[chat_streaming_response]: {str(e)}")
             err = json.dumps({"code": 500, "message": str(e) or "调用失败"}, ensure_ascii=False)
@@ -137,18 +187,25 @@ class ChatService:
         db_connection.commit()
 
     def _clean_messages(self, messages):
-        """清洗会话历史消息，仅保留前端所需的字段，过滤空记录。
+        """清洗会话历史消息，仅保留前端所需的字段。
 
-        返回结构: [{role, content, timestamp, tool_name}, ...]
-          - HumanMessage: role=human, content=content, timestamp=additional_kwargs.timestamp
-          - AIMessage:    role=ai,     content=content
-          - ToolMessage:  role=tool,   tool_name=name
+        多 Agent 架构采用 H1 策略：历史回看只展示"最终回答"，丢弃中间 Agent 过程
+        （检索片段、审查报告等），保持历史简洁。保留：
+          - 所有 HumanMessage（用户输入）
+          - 所有 ToolMessage（工具调用 chips）
+          - 最后一条非空 AIMessage（最终回答）
         过滤规则:
           - 跳过总结服务注入的消息（additional_kwargs.lc_source == "summarization"）
           - content 与 tool_name 均为空的消息不返回
         """
+        # 先找出最后一条非空 AI 消息
+        last_ai_idx = -1
+        for i, msg in enumerate(messages):
+            if isinstance(msg, AIMessage) and msg.content:
+                last_ai_idx = i
+
         cleaned = []
-        for msg in messages:
+        for i, msg in enumerate(messages):
             if msg.additional_kwargs.get("lc_source") == "summarization":
                 continue
             item = {"role": "", "content": "", "timestamp": "", "tool_name": ""}
@@ -157,6 +214,9 @@ class ChatService:
                 item["content"] = msg.content
                 item["timestamp"] = msg.additional_kwargs.get("timestamp", "")
             elif isinstance(msg, AIMessage):
+                # H1：只保留最后一条非空 AI 消息作为最终回答
+                if i != last_ai_idx:
+                    continue
                 item["role"] = "ai"
                 item["content"] = msg.content
             elif isinstance(msg, ToolMessage):

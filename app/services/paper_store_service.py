@@ -6,7 +6,7 @@ from fastapi import UploadFile
 
 from app.business.exceptions import BusinessException
 from app.business.paper_file import PaperFile
-from app.utils.config_handler import es_config
+from app.utils.config_handler import es_config, agent_config
 from app.utils.db_handler import db_connection
 from app.utils.file_handler import get_bytes_md5_hex
 from app.utils.logger_handler import logger
@@ -160,6 +160,58 @@ class PaperStoreService:
             (user_id,),
         )
         return [_row_to_paper_file(row) for row in cursor.fetchall()]
+
+    def query_files(
+        self,
+        user_id: str,
+        *,
+        file_id: str | None = None,
+        topic: str | None = None,
+        file_name: str | None = None,
+        parse_status: str = "all",
+        limit: int = 10,
+    ) -> list[dict]:
+        """结构化查询当前用户上传的论文元数据（仅限 paper_file 表）。
+
+        安全约束：
+        - WHERE user_id=? 恒定拼接，实现用户级数据隔离；
+        - 全程参数化查询，防 SQL 注入；
+        - SELECT 仅取白名单列，file_path/md5/zip_file_name/md_file_name 等敏感列不返回；
+        - limit 钳制到 [1, structured_query_max_limit]。
+        """
+        max_limit = agent_config["structured_query_max_limit"]
+        limit = max(1, min(limit, max_limit))
+
+        where = ["user_id = ?"]
+        params: list = [user_id]
+
+        if file_id:
+            where.append("file_id = ?")
+            params.append(file_id)
+        if topic:
+            where.append("topic LIKE ?")
+            params.append(f"%{topic}%")
+        if file_name:
+            where.append("file_name LIKE ?")
+            params.append(f"%{file_name}%")
+        if parse_status == "parsed":
+            where.append("is_md_parsed = 1")
+        elif parse_status == "unparsed":
+            where.append("is_md_parsed = 0")
+        elif parse_status == "indexed":
+            where.append("is_indexed = 1")
+
+        sql = (
+            "SELECT file_id, user_id, file_name, topic, is_md_parsed, is_indexed, "
+            "upload_time, update_time "
+            "FROM paper_file WHERE " + " AND ".join(where)
+            + " ORDER BY upload_time DESC LIMIT ?"
+        )
+        params.append(limit)
+
+        cursor = db_connection.cursor()
+        cursor.execute(sql, params)
+        return [dict(row) for row in cursor.fetchall()]
 
 
 paper_store_service = PaperStoreService()

@@ -1,4 +1,17 @@
-export type Role = "human" | "ai" | "tool";
+export type Role = "human" | "ai" | "tool" | "agent";
+
+// 多 Agent 系统的专家节点名
+export type AgentName = "retrieval" | "writing" | "review";
+
+// 工具调用记录（用于 AgentResponse 组件展示）
+export type ToolCall = {
+  id: string;
+  name: string;
+  input?: unknown;
+  output?: unknown;
+  status: "pending" | "running" | "completed" | "failed";
+  duration?: number;
+};
 
 export type ChatMessage = {
   id: string;
@@ -7,6 +20,12 @@ export type ChatMessage = {
   timestamp?: string;
   tool_name?: string;
   isStreaming?: boolean;
+  // 多 Agent：标记该消息归属哪个专家 Agent
+  agent?: AgentName;
+  // Agent 消息的运行状态
+  status?: "running" | "done";
+  // Agent 消息持有的工具调用列表（agents-ui AgentResponse 消费）
+  toolCalls?: ToolCall[];
 };
 
 export type Thread = {
@@ -26,13 +45,16 @@ export type RawHistoryItem = {
   content: string;
   timestamp?: string;
   tool_name?: string;
+  agent?: AgentName;
 };
 
 export type HistoryResponse = RawHistoryItem[];
 
 export type StreamEvent =
-  | { role: "ai"; content: string }
-  | { role: "tool"; tool_name: string };
+  | { role: "ai"; content: string; agent?: AgentName }
+  | { role: "tool"; tool_name: string; agent?: AgentName }
+  | { event: "agent_start"; agent: AgentName }
+  | { event: "agent_end"; agent: AgentName };
 
 export type ThreadListResponse = Thread[];
 

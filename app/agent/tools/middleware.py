@@ -1,7 +1,7 @@
 from typing import Callable
 
 from langchain.agents import AgentState
-from langchain.agents.middleware import wrap_tool_call, before_model, ModelRequest, dynamic_prompt
+from langchain.agents.middleware import wrap_tool_call, before_model
 from langchain.agents.middleware.summarization import SummarizationMiddleware
 from langchain_core.messages import AnyMessage, ToolMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
@@ -10,7 +10,6 @@ from langgraph.types import Command
 
 from app.agent.model.factory import summary_model
 from app.utils.logger_handler import logger
-from app.utils.prompt_loader import load_report_prompt, load_system_prompts
 from app.utils.prompt_loader import load_summary_prompt
 
 #工具调用监控
@@ -42,13 +41,6 @@ def monitor_before_model(
     logger.info(f"[Before Model]即将调用模型，输入消息{len(state['messages'])}条")
     logger.debug(f"[Before Model]即将调用模型，最新的输入:{type(state['messages'][-1]).__name__} | {state['messages'][-1].content.strip()}")
     return None
-
-@dynamic_prompt
-def prompt_switch(request: ModelRequest):
-    is_report = request.runtime.context.get("report", False)
-    if is_report:
-        return load_report_prompt()
-    return load_system_prompts()
 
 
 #带日志记录的总结中间件

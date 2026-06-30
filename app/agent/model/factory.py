@@ -2,15 +2,12 @@ import warnings
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
 from langchain_community.embeddings import DashScopeEmbeddings
 from langchain_community.embeddings.dashscope import embed_with_retry
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
-from langgraph.graph.state import CompiledStateGraph
 
-from app.utils.checkpointer_handler import checkpointer
 from app.utils.config_handler import agent_config, env, es_config
 
 warnings.filterwarnings("ignore", message="`langchain-community` is being sunset")
@@ -39,10 +36,12 @@ class DashScopeEmbeddingsWithDims(DashScopeEmbeddings):
         )[0]["embedding"]
         return embedding
 
+
 class BaseModelFactory(ABC):
     @abstractmethod
     def new(self) -> Optional[Embeddings | BaseChatModel]:
         pass
+
 
 class ChatModelFactory(BaseModelFactory):
     def new(self) -> BaseChatModel:
@@ -53,7 +52,9 @@ class ChatModelFactory(BaseModelFactory):
             api_key=env.DASHSCOPE_API_KEY
         )
 
+
 chat_model = ChatModelFactory().new()
+
 
 class EmbeddingsFactory(BaseModelFactory):
     def new(self) -> Embeddings:
@@ -62,7 +63,9 @@ class EmbeddingsFactory(BaseModelFactory):
             dashscope_api_key=env.DASHSCOPE_API_KEY,
         )
 
+
 embedding_model = EmbeddingsFactory().new()
+
 
 class SummaryModelFactory(BaseModelFactory):
     def new(self) -> BaseChatModel:
@@ -73,21 +76,29 @@ class SummaryModelFactory(BaseModelFactory):
             api_key=env.DASHSCOPE_API_KEY
         )
 
+
 summary_model = SummaryModelFactory().new()
 
-from app.agent.tools.tool import web_search,search_paper_knowledge,get_paper_chunk_context
-from app.utils.prompt_loader import load_system_prompts
-from app.agent.tools.middleware import monitor_tool, monitor_before_model, summarize_middleware
 
-class ReActAgentFactory:
-    @staticmethod
-    def new()-> CompiledStateGraph:
-        return create_agent(
-            model=chat_model,
-            system_prompt=load_system_prompts(),
-            tools=[web_search, search_paper_knowledge, get_paper_chunk_context],
-            middleware=[monitor_tool, monitor_before_model, summarize_middleware],
-            checkpointer=checkpointer,
-        )
+def _role_chat_model(role: str) -> BaseChatModel:
+    """按角色名构造一个带温度的对话模型。
 
-react_agent = ReActAgentFactory().new()
+    role 取值：supervisor / retrieval / writing / review。
+    模型名与温度读取 config/agent.yaml 中对应键。
+    """
+    model_name = agent_config[f"{role}_model_name"]
+    temperature = agent_config[f"{role}_temperature"]
+    return init_chat_model(
+        model=model_name,
+        model_provider=agent_config["chat_model_provider"],
+        temperature=temperature,
+        base_url=env.DASHSCOPE_BASE_URL,
+        api_key=env.DASHSCOPE_API_KEY,
+        streaming=True,
+    )
+
+
+supervisor_model = _role_chat_model("supervisor")
+retrieval_model = _role_chat_model("retrieval")
+writing_model = _role_chat_model("writing")
+review_model = _role_chat_model("review")

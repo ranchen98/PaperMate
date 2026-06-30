@@ -70,17 +70,6 @@ export function ChatSidebar({
           </div>
         </div>
 
-        <div className="p-3">
-          <Button
-            variant="outline"
-            className="w-full justify-start gap-2"
-            onClick={onNewThread}
-          >
-            <Plus className="size-4" />
-            新建对话
-          </Button>
-        </div>
-
         <div className="px-3 pb-2">
           <div
             className={cn(
@@ -110,6 +99,15 @@ export function ChatSidebar({
         </div>
 
         <div className="flex-1 overflow-y-auto px-2 pb-3">
+          <div className="sticky top-0 z-10 bg-sidebar py-1">
+            <div
+              className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 transition-colors hover:bg-sidebar-accent/60"
+              onClick={onNewThread}
+            >
+              <Plus className="size-4 shrink-0 text-primary" />
+              <span className="text-sm font-medium">新建对话</span>
+            </div>
+          </div>
           {isLoading ? (
             <div className="space-y-2 px-2 py-2">
               {[1, 2, 3].map((i) => (
