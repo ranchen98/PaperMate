@@ -9,7 +9,6 @@ from app.business.exceptions import BusinessException
 from app.services.es_service import es_service
 from app.utils.exception_handler import business_exception_handler, global_exception_handler
 from app.utils.logger_handler import logger
-from app.utils.migration_multiagent import migrate_to_multi_agent
 
 
 def _startup_reindex():
@@ -25,8 +24,6 @@ def _startup_reindex():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 多 Agent 升级的一次性历史会话清空（仅执行一次，靠标记文件）
-    migrate_to_multi_agent()
     _startup_reindex()
     yield
 
