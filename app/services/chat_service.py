@@ -48,15 +48,27 @@ class ChatService:
             for row in rows
         ]
 
-    def _check_thread_ownership(self, user_id: str, thread_id: str) -> None:
-        """校验 (user_id, thread_id) 属于当前用户，不存在则抛 403。"""
+    def _get_thread_owner(self, thread_id: str) -> str | None:
+        """返回该 thread_id 的所有者 user_id；不存在（全新会话）则返回 None。"""
         cursor = db_connection.cursor()
         cursor.execute(
-            "SELECT 1 FROM user_thread WHERE user_id = ? AND thread_id = ?",
-            (user_id, thread_id),
+            "SELECT user_id FROM user_thread WHERE thread_id = ?",
+            (thread_id,),
         )
-        if cursor.fetchone() is None:
+        row = cursor.fetchone()
+        return row["user_id"] if row is not None else None
+
+    def _assert_own_thread(self, user_id: str, thread_id: str) -> bool:
+        """校验对 thread_id 的访问权限。
+        返回 True 表示归当前用户所有；False 表示全新会话（无所有者）。
+        若归属其他用户则抛 403。
+        """
+        owner = self._get_thread_owner(thread_id)
+        if owner is None:
+            return False
+        if owner != user_id:
             raise BusinessException(403, "无权访问该会话")
+        return True
 
     def _ensure_thread_record(self, user_id: str, thread_id: str, message: str):
         """确保 user_thread 表中存在 (user_id, thread_id) 记录，不存在则插入；
@@ -83,7 +95,10 @@ class ChatService:
 
     def get_history(self, user_id: str, thread_id: str):
         logger.info(f"[get_history]: user_id={user_id} thread_id={thread_id}")
-        self._check_thread_ownership(user_id, thread_id)
+        owned = self._assert_own_thread(user_id, thread_id)
+        if not owned:
+            # 全新会话（尚无所有者）：无历史，不读取 checkpointer 以避免读到他人遗留数据
+            return []
         config = RunnableConfig(configurable={"thread_id": thread_id})
         checkpoint_tuple = checkpointer.get_tuple(config)
         if checkpoint_tuple is None:
@@ -94,7 +109,17 @@ class ChatService:
     def delete_session(self, user_id: str, thread_id: str):
         """删除会话：校验归属后清理 checkpointer 与 user_thread 记录。"""
         logger.info(f"[delete_session]: user_id={user_id} thread_id={thread_id}")
-        self._check_thread_ownership(user_id, thread_id)
+        owned = self._assert_own_thread(user_id, thread_id)
+        if not owned:
+            # 全新会话：checkpointer 中可能无数据，仍尝试清理以兜底
+            config = RunnableConfig(configurable={"thread_id": thread_id})
+            delete_fn = getattr(checkpointer, "delete", None)
+            if delete_fn is not None:
+                try:
+                    delete_fn(config)
+                except Exception as e:
+                    logger.error(f"[delete_session]清理 checkpointer 失败: {str(e)}", exc_info=True)
+            return
         config = RunnableConfig(configurable={"thread_id": thread_id})
         delete_fn = getattr(checkpointer, "delete", None)
         if delete_fn is not None:
