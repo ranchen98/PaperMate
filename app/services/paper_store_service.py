@@ -71,9 +71,9 @@ class PaperStoreService:
         if not md5:
             raise BusinessException(500, f"文件 {file_name} MD5 计算失败")
 
-        existing = self._find_by_md5(md5)
+        existing = self._find_by_md5(md5, user_id)
         if existing is not None:
-            logger.info(f"[save_files]文件 {file_name} 与已有记录 md5={md5} 重复，跳过落盘")
+            logger.info(f"[save_files]文件 {file_name} 与用户 {user_id} 已有记录 md5={md5} 重复，跳过落盘")
             return existing, False
 
         file_id = uuid.uuid4().hex
@@ -102,21 +102,26 @@ class PaperStoreService:
             raise BusinessException(400, f"文件 {file_name} 类型 .{ext} 不被支持，仅允许 {list(ALLOWED_TYPES)}")
         return f".{ext}"
 
-    def _find_by_md5(self, md5: str):
+    def _find_by_md5(self, md5: str, user_id: str):
         cursor = db_connection.cursor()
-        cursor.execute("SELECT * FROM paper_file WHERE md5 = ?", (md5,))
+        cursor.execute(
+            "SELECT * FROM paper_file WHERE md5 = ? AND user_id = ?",
+            (md5, user_id),
+        )
         row = cursor.fetchone()
         return _row_to_paper_file(row) if row is not None else None
 
-    def delete_file(self, file_id: str) -> None:
+    def delete_file(self, file_id: str, user_id: str) -> None:
         cursor = db_connection.cursor()
         cursor.execute(
-            "SELECT file_path, zip_file_name, is_md_parsed FROM paper_file WHERE file_id = ?",
+            "SELECT file_path, zip_file_name, is_md_parsed, user_id FROM paper_file WHERE file_id = ?",
             (file_id,),
         )
         row = cursor.fetchone()
         if row is None:
             raise BusinessException(404, f"文件 {file_id} 不存在")
+        if row["user_id"] != user_id:
+            raise BusinessException(403, "无权删除该文件")
 
         self._safe_remove(get_abs_path(row["file_path"]), "原始文件")
         if row["zip_file_name"]:

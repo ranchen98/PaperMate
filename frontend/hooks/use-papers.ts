@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { deletePaper, fetchPapers, uploadPapers } from "@/lib/api";
-import { DEFAULT_USER_ID, type PaperFile } from "@/lib/types";
+import type { PaperFile } from "@/lib/types";
 
-export function usePapers() {
+export function usePapers(enabled: boolean = true) {
   const [files, setFiles] = useState<PaperFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -12,7 +12,7 @@ export function usePapers() {
 
   const refresh = useCallback(async () => {
     try {
-      const list = await fetchPapers(DEFAULT_USER_ID);
+      const list = await fetchPapers();
       setFiles(list);
       return list;
     } catch (err) {
@@ -29,8 +29,12 @@ export function usePapers() {
   }, [refresh]);
 
   useEffect(() => {
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
     loadInitial();
-  }, [loadInitial]);
+  }, [enabled, loadInitial]);
 
   const upload = useCallback(
     async (newFiles: File[]) => {
@@ -38,7 +42,7 @@ export function usePapers() {
       setIsUploading(true);
       setError(null);
       try {
-        await uploadPapers(newFiles, DEFAULT_USER_ID);
+        await uploadPapers(newFiles);
         await refresh();
       } catch (err) {
         console.error("[usePapers] upload error:", err);

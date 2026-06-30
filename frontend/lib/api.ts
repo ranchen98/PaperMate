@@ -1,23 +1,73 @@
 import type {
+  AuthUser,
   ChatRequest,
   HistoryResponse,
   PaperFile,
   StreamEvent,
   ThreadListResponse,
 } from "@/lib/types";
+import { ApiError } from "@/lib/types";
 
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+export const UNAUTHORIZED_EVENT = "papermate:unauthorized";
+
+function notifyUnauthorized() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
+  }
+}
+
+async function parseBody(res: Response): Promise<{ code: number; message: string; data: unknown }> {
+  try {
+    return await res.json();
+  } catch {
+    return { code: res.status, message: "", data: null };
+  }
+}
+
+async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, { credentials: "same-origin", ...init });
+  if (!res.ok) {
+    const body = await parseBody(res);
+    if (res.status === 401) notifyUnauthorized();
+    throw new ApiError(
+      res.status,
+      body?.message || `HTTP ${res.status}: ${res.statusText}`,
+    );
+  }
   const body = await res.json();
-  if (body.code !== 200) throw new Error(body.message || `业务错误 ${body.code}`);
+  if (body.code !== 200) {
+    if (body.code === 401) notifyUnauthorized();
+    throw new ApiError(body.code, body.message || `业务错误 ${body.code}`);
+  }
   return body.data as T;
 }
 
-export async function fetchThreads(userId: string): Promise<ThreadListResponse> {
-  return getJson<ThreadListResponse>(
-    `/chat/get_thread_ids?user_id=${encodeURIComponent(userId)}`,
-  );
+export async function fetchMe(): Promise<AuthUser> {
+  return getJson<AuthUser>("/auth/me");
+}
+
+export async function login(username: string, password: string): Promise<AuthUser> {
+  return getJson<AuthUser>("/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+}
+
+export async function register(username: string, password: string): Promise<AuthUser> {
+  return getJson<AuthUser>("/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+}
+
+export async function logout(): Promise<void> {
+  await getJson<null>("/auth/logout", { method: "POST" });
+}
+
+export async function fetchThreads(): Promise<ThreadListResponse> {
+  return getJson<ThreadListResponse>(`/chat/get_thread_ids`);
 }
 
 export async function fetchHistory(threadId: string): Promise<HistoryResponse> {
@@ -27,43 +77,62 @@ export async function fetchHistory(threadId: string): Promise<HistoryResponse> {
 }
 
 export async function deleteThread(threadId: string): Promise<void> {
-  await getJson(
-    `/chat/delete_session?thread_id=${encodeURIComponent(threadId)}`,
-  );
+  await getJson(`/chat/delete_session?thread_id=${encodeURIComponent(threadId)}`);
 }
 
-export async function fetchPapers(userId: string): Promise<PaperFile[]> {
-  return getJson<PaperFile[]>(
-    `/paper/files?user_id=${encodeURIComponent(userId)}`,
-  );
+export async function fetchPapers(): Promise<PaperFile[]> {
+  return getJson<PaperFile[]>(`/paper/files`);
 }
 
 export async function uploadPapers(
   files: File[],
-  userId: string,
   topic: string = "",
 ): Promise<PaperFile[]> {
   const form = new FormData();
   for (const file of files) {
     form.append("files", file);
   }
-  form.append("user_id", userId);
   form.append("topic", topic);
 
-  const res = await fetch("/paper/upload", { method: "POST", body: form });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  const res = await fetch("/paper/upload", {
+    method: "POST",
+    credentials: "same-origin",
+    body: form,
+  });
+  if (!res.ok) {
+    const body = await parseBody(res);
+    if (res.status === 401) notifyUnauthorized();
+    throw new ApiError(
+      res.status,
+      body?.message || `HTTP ${res.status}: ${res.statusText}`,
+    );
+  }
   const body = await res.json();
-  if (body.code !== 200) throw new Error(body.message || `业务错误 ${body.code}`);
+  if (body.code !== 200) {
+    if (body.code === 401) notifyUnauthorized();
+    throw new ApiError(body.code, body.message || `业务错误 ${body.code}`);
+  }
   return body.data as PaperFile[];
 }
 
 export async function deletePaper(fileId: string): Promise<void> {
   const res = await fetch(`/paper/files/${encodeURIComponent(fileId)}`, {
     method: "DELETE",
+    credentials: "same-origin",
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  if (!res.ok) {
+    const body = await parseBody(res);
+    if (res.status === 401) notifyUnauthorized();
+    throw new ApiError(
+      res.status,
+      body?.message || `HTTP ${res.status}: ${res.statusText}`,
+    );
+  }
   const body = await res.json();
-  if (body.code !== 200) throw new Error(body.message || `业务错误 ${body.code}`);
+  if (body.code !== 200) {
+    if (body.code === 401) notifyUnauthorized();
+    throw new ApiError(body.code, body.message || `业务错误 ${body.code}`);
+  }
 }
 
 export async function* streamChat(
@@ -72,11 +141,14 @@ export async function* streamChat(
   const res = await fetch("/chat/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
     body: JSON.stringify(request),
   });
 
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-  if (!res.body) throw new Error("Response body is null");
+  if (!res.ok || !res.body) {
+    if (res.status === 401) notifyUnauthorized();
+    throw new ApiError(res.status, `HTTP ${res.status}: ${res.statusText}`);
+  }
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -110,16 +182,14 @@ export async function* streamChat(
           const err = JSON.parse(dataLine);
           errMsg = err.message || errMsg;
         } catch {
-          // 非 JSON 错误，用原文
           errMsg = dataLine;
         }
-        throw new Error(errMsg);
+        throw new ApiError(500, errMsg);
       }
 
       try {
         yield JSON.parse(dataLine) as StreamEvent;
       } catch {
-        // 兼容旧格式纯文本，作为 ai content 处理
         yield { role: "ai", content: dataLine };
       }
     }

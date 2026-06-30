@@ -1,4 +1,5 @@
 from langchain.tools import tool
+from langchain_core.runnables import ensure_config
 from langchain_tavily import TavilySearch
 
 from app.business.search_knowledge_input import SearchPaperKnowledgeInput, GetPaperChunkContextInput
@@ -34,7 +35,8 @@ def search_paper_knowledge(query: str, top_k: int = 5) -> str:
     【不适用场景】用户询问的内容与论文无关（如闲聊、常识问题、实时新闻等）时不适用。
     【返回说明】采用ES混合检索（向量语义+字面术语BM25，RRF融合），每个片段含"相关度"分值（越大越相似）。
     """
-    docs_with_scores = es_service.hybrid_search(query, top_k=top_k)
+    user_id = ensure_config().get("configurable", {}).get("user_id", "")
+    docs_with_scores = es_service.hybrid_search(query, user_id=user_id, top_k=top_k)
 
     if not docs_with_scores:
         return f"未在知识库中找到与 '{query}' 相关的信息。建议：1. 尝试更换同义词重新搜索；2. 告知用户知识库中暂无此内容。"
@@ -59,7 +61,8 @@ def get_paper_chunk_context(file_id: str, chunk_index: int, window_size: int = 3
     【不适用场景】检索结果已经完整回答了问题时不应使用。
     【使用方式】从检索结果中获取file_id和chunk_index，传入本工具即可获取相邻片段。
     """
-    chunks = es_service.get_chunk_window(file_id, chunk_index, window_size)
+    user_id = ensure_config().get("configurable", {}).get("user_id", "")
+    chunks = es_service.get_chunk_window(file_id, chunk_index, user_id=user_id, window_size=window_size)
 
     if not chunks:
         return f"未找到文档 {file_id} 的任何片段。请确认file_id是否正确，或该文档可能尚未入库。"

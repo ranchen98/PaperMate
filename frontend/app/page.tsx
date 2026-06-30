@@ -1,17 +1,52 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Menu, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Menu, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatSidebar, type SidebarView } from "@/components/chat-sidebar";
 import { ChatMessageList } from "@/components/chat-message-list";
 import { ChatInput } from "@/components/chat-input";
 import { KnowledgeBase } from "@/components/knowledge-base";
+import { useAuth } from "@/components/auth-provider";
 import { useThreads } from "@/hooks/use-threads";
 import { useChat } from "@/hooks/use-chat";
 import { usePapers } from "@/hooks/use-papers";
 
 export default function Home() {
+  const router = useRouter();
+  const { user, isLoading, logout } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading && !user) router.replace("/login");
+  }, [user, isLoading, router]);
+
+  if (isLoading || !user) {
+    return (
+      <div className="flex h-dvh w-full items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <AppContent
+      username={user.username}
+      userId={user.user_id}
+      onLogout={logout}
+    />
+  );
+}
+
+function AppContent({
+  username,
+  userId,
+  onLogout,
+}: {
+  username: string;
+  userId: string;
+  onLogout: () => void;
+}) {
   const {
     threads,
     currentThreadId,
@@ -29,7 +64,7 @@ export default function Home() {
     error,
     sendMessage,
     stopStreaming,
-  } = useChat(currentThreadId, refresh);
+  } = useChat(currentThreadId, refresh, userId);
 
   const {
     files,
@@ -87,11 +122,13 @@ export default function Home() {
         isLoading={isLoadingThreads}
         isOpen={sidebarOpen}
         view={view}
+        username={username}
         onClose={() => setSidebarOpen(false)}
         onNewThread={handleNewThread}
         onSelectThread={handleSelectThread}
         onDeleteThread={handleDeleteThread}
         onSelectView={handleSelectView}
+        onLogout={onLogout}
       />
 
       <main className="flex flex-1 flex-col overflow-hidden">

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 function proxyUrl(request: NextRequest, pathSegments: string[]): string {
   const path = pathSegments.join("/");
   const search = request.nextUrl.search;
-  return backendUrl("chat", [path], search);
+  return backendUrl("auth", [path], search);
 }
 
 export async function GET(
@@ -59,10 +59,9 @@ export async function POST(
   const headers = new Headers();
   headers.set(
     "Content-Type",
-    backendRes.headers.get("Content-Type") ?? "text/event-stream",
+    backendRes.headers.get("Content-Type") ?? "application/json",
   );
-  headers.set("Cache-Control", "no-cache, no-transform");
-  headers.set("Connection", "keep-alive");
+  headers.set("Cache-Control", "no-store");
   applySetCookie(backendRes, headers);
 
   if (!backendRes.ok) {
@@ -70,10 +69,6 @@ export async function POST(
       status: backendRes.status,
       headers,
     });
-  }
-
-  if (!backendRes.body) {
-    return new Response("Backend response body is null", { status: 502, headers });
   }
 
   return new Response(backendRes.body, {

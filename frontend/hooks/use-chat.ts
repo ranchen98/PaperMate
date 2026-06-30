@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchHistory, streamChat } from "@/lib/api";
 import {
-  DEFAULT_USER_ID,
   type ChatMessage,
   type RawHistoryItem,
   type Role,
@@ -27,6 +26,7 @@ function adaptHistory(items: RawHistoryItem[]): ChatMessage[] {
 export function useChat(
   threadId: string | null,
   onStreamComplete?: () => void,
+  userId: string = "",
 ) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -90,7 +90,7 @@ export function useChat(
       const request = {
         thread_id: threadId,
         message: content.trim(),
-        user_id: DEFAULT_USER_ID,
+        user_id: userId,
       };
 
       try {

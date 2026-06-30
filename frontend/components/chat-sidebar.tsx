@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, MessageSquare, Trash2, X, Library } from "lucide-react";
+import { Plus, MessageSquare, Trash2, X, Library, LogOut, User } from "lucide-react";
 import { cn, formatTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -14,11 +14,13 @@ type ChatSidebarProps = {
   isLoading: boolean;
   isOpen: boolean;
   view: SidebarView;
+  username: string;
   onClose: () => void;
   onNewThread: () => void;
   onSelectThread: (threadId: string) => void;
   onDeleteThread: (threadId: string) => void;
   onSelectView: (view: SidebarView) => void;
+  onLogout: () => void;
 };
 
 export function ChatSidebar({
@@ -27,11 +29,13 @@ export function ChatSidebar({
   isLoading,
   isOpen,
   view,
+  username,
   onClose,
   onNewThread,
   onSelectThread,
   onDeleteThread,
   onSelectView,
+  onLogout,
 }: ChatSidebarProps) {
   return (
     <>
@@ -168,6 +172,24 @@ export function ChatSidebar({
               })}
             </ul>
           )}
+        </div>
+
+        <div className="border-t px-3 py-2">
+          <div className="flex items-center gap-2 rounded-lg px-3 py-2">
+            <User className="size-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">
+              {username}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="shrink-0"
+              onClick={onLogout}
+              title="退出登录"
+            >
+              <LogOut className="text-muted-foreground" />
+            </Button>
+          </div>
         </div>
       </aside>
     </>

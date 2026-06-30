@@ -5,6 +5,7 @@ from app.utils.db_handler import db_connection
 from app.agent.chat_agent import chat_agent
 from app.utils.logger_handler import logger
 from app.business.chat_request import ChatRequest
+from app.business.exceptions import BusinessException
 import json
 
 class ChatService:
@@ -47,6 +48,16 @@ class ChatService:
             for row in rows
         ]
 
+    def _check_thread_ownership(self, user_id: str, thread_id: str) -> None:
+        """校验 (user_id, thread_id) 属于当前用户，不存在则抛 403。"""
+        cursor = db_connection.cursor()
+        cursor.execute(
+            "SELECT 1 FROM user_thread WHERE user_id = ? AND thread_id = ?",
+            (user_id, thread_id),
+        )
+        if cursor.fetchone() is None:
+            raise BusinessException(403, "无权访问该会话")
+
     def _ensure_thread_record(self, user_id: str, thread_id: str, message: str):
         """确保 user_thread 表中存在 (user_id, thread_id) 记录，不存在则插入；
         任何情况下都更新 latest_message 为当前用户输入的前 40 个字符，并刷新 update_time。
@@ -70,14 +81,35 @@ class ChatService:
             )
         db_connection.commit()
 
-    def get_history(self, thread_id):
-        logger.info(f"[get_history]: {thread_id}")
+    def get_history(self, user_id: str, thread_id: str):
+        logger.info(f"[get_history]: user_id={user_id} thread_id={thread_id}")
+        self._check_thread_ownership(user_id, thread_id)
         config = RunnableConfig(configurable={"thread_id": thread_id})
         checkpoint_tuple = checkpointer.get_tuple(config)
         if checkpoint_tuple is None:
             return []
         messages = checkpoint_tuple.checkpoint["channel_values"]["messages"]
         return self._clean_messages(messages)
+
+    def delete_session(self, user_id: str, thread_id: str):
+        """删除会话：校验归属后清理 checkpointer 与 user_thread 记录。"""
+        logger.info(f"[delete_session]: user_id={user_id} thread_id={thread_id}")
+        self._check_thread_ownership(user_id, thread_id)
+        config = RunnableConfig(configurable={"thread_id": thread_id})
+        delete_fn = getattr(checkpointer, "delete", None)
+        if delete_fn is not None:
+            try:
+                delete_fn(config)
+            except Exception as e:
+                logger.error(f"[delete_session]清理 checkpointer 失败: {str(e)}", exc_info=True)
+        else:
+            logger.warning("[delete_session]当前 checkpointer 不支持 delete，仅清理 DB 记录")
+        cursor = db_connection.cursor()
+        cursor.execute(
+            "DELETE FROM user_thread WHERE user_id = ? AND thread_id = ?",
+            (user_id, thread_id),
+        )
+        db_connection.commit()
 
     def _clean_messages(self, messages):
         """清洗会话历史消息，仅保留前端所需的字段，过滤空记录。
@@ -115,4 +147,4 @@ class ChatService:
 chat_service = ChatService()
 
 if __name__ == "__main__":
-    print(chat_service.get_history("sess_1781506489579"))
+    print(chat_service.get_history("default_user", "sess_1781506489579"))

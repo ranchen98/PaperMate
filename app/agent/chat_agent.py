@@ -26,7 +26,10 @@ class ChatAgent:
             logger.info("[ChatAgent] test query detected, return 'call success' directly")
             yield AIMessageChunk(content="call success"), {}
             return
-        config = RunnableConfig(configurable={"thread_id": request.thread_id})
+        config = RunnableConfig(configurable={
+            "thread_id": request.thread_id,
+            "user_id": request.user_id,
+        })
         yield from self.agent.stream(
             input={"messages": [build_human_message(request.message)]},
             config=config,
@@ -34,7 +37,10 @@ class ChatAgent:
         )
 
     def invoke(self, request: ChatRequest):
-        config = RunnableConfig(configurable={"thread_id": request.thread_id})
+        config = RunnableConfig(configurable={
+            "thread_id": request.thread_id,
+            "user_id": request.user_id,
+        })
         return self.agent.invoke(
             input={"messages": [build_human_message(request.message)]},
             config=config,

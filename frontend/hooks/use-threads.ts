@@ -2,16 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { deleteThread, fetchThreads } from "@/lib/api";
-import { DEFAULT_USER_ID, generateThreadId, type Thread } from "@/lib/types";
+import { generateThreadId, type Thread } from "@/lib/types";
 
-export function useThreads() {
+export function useThreads(enabled: boolean = true) {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     try {
-      const list = await fetchThreads(DEFAULT_USER_ID);
+      const list = await fetchThreads();
       setThreads(list);
       return list;
     } catch (err) {
@@ -30,8 +30,12 @@ export function useThreads() {
   }, [refresh]);
 
   useEffect(() => {
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
     loadInitial();
-  }, [loadInitial]);
+  }, [enabled, loadInitial]);
 
   const createNewThread = useCallback(() => {
     const id = generateThreadId();

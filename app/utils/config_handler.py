@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     ES_PASSWORD: str | None = None
     MINERU_URL: str
     MINERU_TOKEN: str
+    JWT_SECRET: str
+    JWT_ALG: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_DAYS: int = 7
 
 env = Settings()
 

@@ -17,6 +17,23 @@ def _create_connection():
 def _init_tables(connection):
     """初始化数据库表"""
     cursor = connection.cursor()
+    # 用户表：注册账号
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            user_id        TEXT      PRIMARY KEY,
+            username       TEXT      NOT NULL UNIQUE,
+            password_hash  TEXT      NOT NULL,
+            create_time    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_users_username
+        ON users (username)
+        """
+    )
     # user 与 thread 的关系表
     cursor.execute(
         """

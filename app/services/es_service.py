@@ -44,6 +44,7 @@ class EsService:
             "mappings": {
                 "properties": {
                     "file_id": {"type": "keyword"},
+                    "user_id": {"type": "keyword"},
                     "chunk_index": {"type": "integer"},
                     "source": {"type": "keyword"},
                     "content": {
@@ -63,10 +64,24 @@ class EsService:
         }
 
     def _ensure_index(self) -> None:
-        if self.es.indices.exists(index=self.index):
+        if not self.es.indices.exists(index=self.index):
+            self.es.indices.create(index=self.index, body=self._index_body())
+            logger.info(f"[ES]索引 {self.index} 创建完成")
             return
-        self.es.indices.create(index=self.index, body=self._index_body())
-        logger.info(f"[ES]索引 {self.index} 创建完成")
+        # 自愈迁移：旧索引缺少 user_id 字段时，删旧重建并重置已解析文件入库标记
+        mapping = self.es.indices.get_mapping(index=self.index)
+        mapping_doc = next(iter(mapping.values()), {})
+        props = mapping_doc.get("mappings", {}).get("properties", {})
+        if "user_id" not in props:
+            logger.warning(f"[ES]索引 {self.index} 缺少 user_id 字段，删除并重建")
+            self.es.indices.delete(index=self.index)
+            self.es.indices.create(index=self.index, body=self._index_body())
+            cursor = db_connection.cursor()
+            cursor.execute(
+                "UPDATE paper_file SET is_indexed = 0 WHERE is_md_parsed = 1"
+            )
+            db_connection.commit()
+            logger.info(f"[ES]索引 {self.index} 重建完成，已重置待入库标记")
 
     def _embed_batch(self, texts: list[str]) -> list[list[float]]:
         batch_size = es_config["embed_batch_size"]
@@ -86,7 +101,7 @@ class EsService:
 
         cursor = db_connection.cursor()
         cursor.execute(
-            "SELECT file_id, file_name, md5 FROM paper_file "
+            "SELECT file_id, user_id, file_name, md5 FROM paper_file "
             "WHERE is_md_parsed = 1 AND is_indexed = 0"
         )
         pending = cursor.fetchall()
@@ -96,6 +111,7 @@ class EsService:
 
         for row in pending:
             file_id = row["file_id"]
+            user_id = row["user_id"]
             file_name = row["file_name"]
             md_path = os.path.join(MD_DIR, file_id, "full.md")
 
@@ -138,6 +154,7 @@ class EsService:
                             "content": doc.page_content,
                             "embedding": vec,
                             "file_id": file_id,
+                            "user_id": user_id,
                             "chunk_index": doc.metadata["chunk_index"],
                             "source": doc.metadata["source"],
                         },
@@ -154,20 +171,27 @@ class EsService:
                 logger.error(f"[加载知识库]{file_name} 加载失败：{str(e)}", exc_info=True)
                 continue
 
-    def delete_document(self, file_id: str) -> None:
-        """删除指定 file_id 在 ES 中的所有分片文档。"""
+    def delete_document(self, file_id: str, user_id: str) -> None:
+        """删除指定 file_id 在 ES 中的所有分片文档（限定 user_id）。"""
         try:
             self._ensure_index()
             self.es.delete_by_query(
                 index=self.index,
-                query={"term": {"file_id": file_id}},
+                query={
+                    "bool": {
+                        "must": [
+                            {"term": {"file_id": file_id}},
+                            {"term": {"user_id": user_id}},
+                        ]
+                    }
+                },
                 refresh=True,
             )
-            logger.info(f"[ES]已删除 file_id={file_id} 的所有分片")
+            logger.info(f"[ES]已删除 user_id={user_id} file_id={file_id} 的所有分片")
         except Exception as e:
-            logger.error(f"[ES]删除 file_id={file_id} 失败：{str(e)}", exc_info=True)
+            logger.error(f"[ES]删除 user_id={user_id} file_id={file_id} 失败：{str(e)}", exc_info=True)
 
-    def hybrid_search(self, query: str, top_k: int = 3) -> list[tuple[Document, float]]:
+    def hybrid_search(self, query: str, user_id: str, top_k: int = 3) -> list[tuple[Document, float]]:
         try:
             query_vector = embedding_model.embed_query(query)
         except Exception as e:
@@ -179,12 +203,21 @@ class EsService:
         dense_weight = es_config["dense_weight"]
         bm25_weight = es_config["bm25_weight"]
 
+        user_filter = {"term": {"user_id": user_id}}
+
         # BM25 路（倒排检索）
         bm25_body = {
             "query": {
-                "multi_match": {
-                    "query": query,
-                    "fields": ["content", "content.english"],
+                "bool": {
+                    "must": [
+                        {
+                            "multi_match": {
+                                "query": query,
+                                "fields": ["content", "content.english"],
+                            }
+                        }
+                    ],
+                    "filter": [user_filter],
                 }
             },
             "size": fetch_k,
@@ -196,6 +229,7 @@ class EsService:
                 "query_vector": query_vector,
                 "k": fetch_k,
                 "num_candidates": es_config["knn_num_candidates"],
+                "filter": user_filter,
             },
             "size": fetch_k,
         }
@@ -237,7 +271,7 @@ class EsService:
         ranked = sorted(fusion.values(), key=lambda x: x["score"], reverse=True)
         return [(item["doc"], item["score"]) for item in ranked[:top_k]]
 
-    def get_chunk_window(self, file_id: str, chunk_index: int, window_size: int = 3) -> list[dict]:
+    def get_chunk_window(self, file_id: str, chunk_index: int, user_id: str, window_size: int = 3) -> list[dict]:
         min_idx = max(0, chunk_index - window_size)
         max_idx = chunk_index + window_size
         try:
@@ -246,7 +280,10 @@ class EsService:
                 body={
                     "query": {
                         "bool": {
-                            "must": [{"term": {"file_id": file_id}}],
+                            "must": [
+                                {"term": {"file_id": file_id}},
+                                {"term": {"user_id": user_id}},
+                            ],
                             "filter": [{"range": {"chunk_index": {"gte": min_idx, "lte": max_idx}}}],
                         }
                     },

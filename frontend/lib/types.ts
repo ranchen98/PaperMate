@@ -47,7 +47,19 @@ export type PaperFile = {
   update_time: string;
 };
 
-export const DEFAULT_USER_ID = "default_user";
+export type AuthUser = {
+  user_id: string;
+  username: string;
+};
+
+export class ApiError extends Error {
+  code: number;
+  constructor(code: number, message: string) {
+    super(message);
+    this.code = code;
+    this.name = "ApiError";
+  }
+}
 
 export function generateThreadId(): string {
   return `sess_${Date.now()}`;
