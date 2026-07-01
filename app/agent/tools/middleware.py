@@ -1,8 +1,9 @@
 from typing import Callable
 
 from langchain.agents import AgentState
-from langchain.agents.middleware import wrap_tool_call, before_model
+from langchain.agents.middleware import wrap_tool_call, before_model, wrap_model_call
 from langchain.agents.middleware.summarization import SummarizationMiddleware
+from langchain.agents.middleware.types import ModelResponse
 from langchain_core.messages import AnyMessage, ToolMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.runtime import Runtime
@@ -11,6 +12,26 @@ from langgraph.types import Command
 from app.agent.model.factory import summary_model
 from app.utils.logger_handler import logger
 from app.utils.prompt_loader import load_summary_prompt
+
+
+def make_agent_tag_middleware(agent_name: str):
+    """生成一个中间件，给该专家每次模型调用产出的消息打上 `additional_kwargs["agent"]` 标签。
+
+    写作/审查 Agent 为函数节点，直接在节点内对 response 打标；检索 Agent 用
+    `create_agent` 子图装配，需通过中间件在每次模型调用后给 AIMessage 打标，
+    以便历史回放时能据标签重建"哪条消息来自哪个专家"。
+    """
+
+    @wrap_model_call
+    def tag_model_call(request, handler) -> ModelResponse:
+        response = handler(request)
+        for msg in getattr(response, "result", []) or []:
+            kw = msg.additional_kwargs or {}
+            kw["agent"] = agent_name
+            msg.additional_kwargs = kw
+        return response
+
+    return tag_model_call
 
 #工具调用监控
 @wrap_tool_call

@@ -194,6 +194,7 @@ export async function* streamChat(
         role?: string;
         content?: string;
         tool_name?: string;
+        final?: boolean;
       };
       try {
         parsed = JSON.parse(dataLine);

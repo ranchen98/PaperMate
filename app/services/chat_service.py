@@ -10,6 +10,8 @@ import json
 
 # 多 Agent 超级图中的专家节点名（Supervisor 不对外输出）
 _EXPERT_NODES = ("retrieval", "writing", "review")
+# 最终整合节点：其 AI 输出为面向用户的最终答复，前端据此提升为主对话框展示
+_FINAL_NODE = "final_assembler"
 
 
 class ChatService:
@@ -27,7 +29,7 @@ class ChatService:
 
             for chunk, metadata, namespace in chat_agent.stream(request):
                 # subgraphs=True 格式：(chunk, metadata, namespace)
-                # namespace=() → 父图事件（supervisor / writing / review 函数节点）
+                # namespace=() → 父图事件（supervisor / writing / review / final_assembler 函数节点）
                 # namespace=("retrieval:uuid",) → retrieval 子图事件
                 node = metadata.get("langgraph_node") if metadata else None
 
@@ -37,7 +39,8 @@ class ChatService:
                     if ns_name in _EXPERT_NODES:
                         node = ns_name
 
-                # 检测 Agent 切换：先结束上一个专家，再开启新专家
+                # 检测"过程专家"切换：先结束上一个，再开启新一个。
+                # final_assembler 不作为过程专家对外开/关节点，其内容直接以 final 标记输出。
                 if node in _EXPERT_NODES and node != current_agent:
                     if current_agent is not None:
                         yield _agent_end_event(current_agent)
@@ -61,6 +64,9 @@ class ChatService:
                         payload = {"role": "ai", "content": content}
                         if node in _EXPERT_NODES:
                             payload["agent"] = node
+                        elif node == _FINAL_NODE:
+                            # 最终整合输出：直接标记 final，前端提升为主对话框最终答复
+                            payload["final"] = True
                         yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
                 elif isinstance(chunk, ToolMessage):
                     tool_name = chunk.name or ""
@@ -70,7 +76,7 @@ class ChatService:
                             payload["agent"] = node
                         yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
-            # 流结束：补发最后一个 Agent 的 end 事件
+            # 流结束：补发最后一个过程专家的 end 事件
             if current_agent is not None:
                 yield _agent_end_event(current_agent)
         except Exception as e:
@@ -187,46 +193,77 @@ class ChatService:
         db_connection.commit()
 
     def _clean_messages(self, messages):
-        """清洗会话历史消息，仅保留前端所需的字段。
-
-        多 Agent 架构采用 H1 策略：历史回看只展示"最终回答"，丢弃中间 Agent 过程
-        （检索片段、审查报告等），保持历史简洁。保留：
-          - 所有 HumanMessage（用户输入）
-          - 所有 ToolMessage（工具调用 chips）
-          - 最后一条非空 AIMessage（最终回答）
-        过滤规则:
-          - 跳过总结服务注入的消息（additional_kwargs.lc_source == "summarization"）
-          - content 与 tool_name 均为空的消息不返回
+        """历史回放分组策略：按用户消息切分轮次（turn），每轮还原：
+          - 参与的专家（按出现顺序，含 thought 与调用的工具名 tools[]）；
+            最终整合（agent=="final"）的消息不作为过程专家卡，而是提取为 final_answer。
+          - 最终答复（final_answer）：取该轮内 `agent=="final"` 的 AI 正文（final_assembler 的输出）。
+            这是图的唯一终点出口，保证每轮恰好有一个最终答复。
+        跳过：总结服务注入消息（additional_kwargs.lc_source == "summarization"）。
+        工具仅显示工具名（不返回 args/output），与流式阶段一致。
         """
-        # 先找出最后一条非空 AI 消息
-        last_ai_idx = -1
-        for i, msg in enumerate(messages):
-            if isinstance(msg, AIMessage) and msg.content:
-                last_ai_idx = i
+        cleaned: list[dict] = []
+        turn_id = 0
+        turn_agents: list[dict] = []
+        turn_agent_index: dict[str, int] = {}
+        turn_final_answer = ""
 
-        cleaned = []
-        for i, msg in enumerate(messages):
+        def _flush_turn():
+            cleaned.append({
+                "role": "turn",
+                "turn_id": turn_id,
+                "agents": list(turn_agents),
+                "final_answer": turn_final_answer,
+            })
+
+        for msg in messages:
             if msg.additional_kwargs.get("lc_source") == "summarization":
                 continue
-            item = {"role": "", "content": "", "timestamp": "", "tool_name": ""}
             if isinstance(msg, HumanMessage):
-                item["role"] = "human"
-                item["content"] = msg.content
-                item["timestamp"] = msg.additional_kwargs.get("timestamp", "")
-            elif isinstance(msg, AIMessage):
-                # H1：只保留最后一条非空 AI 消息作为最终回答
-                if i != last_ai_idx:
+                if turn_agents or turn_final_answer:
+                    _flush_turn()
+                    turn_id += 1
+                    turn_agents = []
+                    turn_agent_index = {}
+                    turn_final_answer = ""
+                cleaned.append({
+                    "role": "human",
+                    "content": msg.content,
+                    "timestamp": msg.additional_kwargs.get("timestamp", ""),
+                })
+                continue
+            if isinstance(msg, AIMessage):
+                if not msg.content:
                     continue
-                item["role"] = "ai"
-                item["content"] = msg.content
-            elif isinstance(msg, ToolMessage):
-                item["role"] = "tool"
-                item["tool_name"] = msg.name or ""
-            else:
+                agent = msg.additional_kwargs.get("agent", "")
+                if agent == "final":
+                    # 最终整合输出：直接作为本轮最终答复
+                    turn_final_answer = (turn_final_answer + msg.content) if turn_final_answer else msg.content
+                    continue
+                if agent in ("retrieval", "writing", "review"):
+                    if agent not in turn_agent_index:
+                        turn_agent_index[agent] = len(turn_agents)
+                        turn_agents.append({"agent": agent, "thought": "", "tools": []})
+                    idx = turn_agent_index[agent]
+                    turn_agents[idx]["thought"] = (
+                        (turn_agents[idx]["thought"] + msg.content)
+                        if turn_agents[idx]["thought"] else msg.content
+                    )
+                # 无 agent 标签的 AI：忽略（不应出现，supervisor 路由 JSON 已在流式阶段过滤）
                 continue
-            if not item["content"] and not item["tool_name"]:
+            if isinstance(msg, ToolMessage):
+                tool_name = msg.name or ""
+                if not tool_name:
+                    continue
+                # 工具仅来自检索 Agent
+                agent = "retrieval"
+                if agent not in turn_agent_index:
+                    turn_agent_index[agent] = len(turn_agents)
+                    turn_agents.append({"agent": agent, "thought": "", "tools": []})
+                turn_agents[turn_agent_index[agent]]["tools"].append(tool_name)
                 continue
-            cleaned.append(item)
+
+        if turn_agents or turn_final_answer:
+            _flush_turn()
         return cleaned
 
 chat_service = ChatService()

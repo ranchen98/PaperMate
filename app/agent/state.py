@@ -37,3 +37,7 @@ class MultiAgentState(TypedDict):
 
     messages: Annotated[list[AnyMessage], add_messages]
     rounds: int
+    last_expert: str
+    """上一跳被 Supervisor 路由到的专家节点名（retrieval/writing/review），
+    用于防同一专家被连续重复路由（writing→writing / review→review）。
+    由 Supervisor 在 `Command(update=...)` 中写入；各专家节点无需显式更新。"""

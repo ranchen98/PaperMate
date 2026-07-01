@@ -7,3 +7,4 @@ supervisor_prompt_path: prompts/experts/supervisor.txt
 retrieval_prompt_path: prompts/experts/retrieval.txt
 writing_prompt_path: prompts/experts/writing.txt
 review_prompt_path: prompts/experts/review.txt
+final_prompt_path: prompts/experts/final.txt

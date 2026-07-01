@@ -39,5 +39,12 @@ def review_node(state: dict, config: RunnableConfig) -> dict:
     )
 
     if new_msgs:
-        return {"messages": [*new_msgs, response]}
-    return {"messages": [response]}
+        result_msgs = [*new_msgs, response]
+    else:
+        result_msgs = [response]
+
+    # 给本轮模型产出打上专家标签，历史回放时据此重建"哪条 AI 消息来自哪个专家"
+    kw = response.additional_kwargs or {}
+    kw["agent"] = "review"
+    response.additional_kwargs = kw
+    return {"messages": result_msgs}

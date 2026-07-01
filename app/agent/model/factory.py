@@ -83,7 +83,7 @@ summary_model = SummaryModelFactory().new()
 def _role_chat_model(role: str) -> BaseChatModel:
     """按角色名构造一个带温度的对话模型。
 
-    role 取值：supervisor / retrieval / writing / review。
+    role 取值：supervisor / retrieval / writing / review / final。
     模型名与温度读取 config/agent.yaml 中对应键。
     """
     model_name = agent_config[f"{role}_model_name"]
@@ -102,3 +102,4 @@ supervisor_model = _role_chat_model("supervisor")
 retrieval_model = _role_chat_model("retrieval")
 writing_model = _role_chat_model("writing")
 review_model = _role_chat_model("review")
+final_model = _role_chat_model("final")

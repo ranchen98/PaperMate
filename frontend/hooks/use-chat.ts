@@ -16,14 +16,53 @@ function makeId() {
   return `msg-${++msgSeq}`;
 }
 
+// 历史回放：把后端分组结构还原为前端流式所需的消息序列：
+//   human -> 各 agent 卡（含 turn_id）-> 最终答复（isFinalAnswer）
 function adaptHistory(items: RawHistoryItem[]): ChatMessage[] {
-  return items.map((item) => ({
-    id: makeId(),
-    role: (item.role ?? "ai") as Role,
-    content: item.content ?? "",
-    timestamp: item.timestamp ?? undefined,
-    tool_name: item.tool_name || undefined,
-  }));
+  const out: ChatMessage[] = [];
+  let turnId = 0;
+  for (const item of items) {
+    if (item.role === "human") {
+      out.push({
+        id: makeId(),
+        role: "human" as Role,
+        content: item.content ?? "",
+        timestamp: item.timestamp ?? undefined,
+        turn_id: turnId,
+      });
+      continue;
+    }
+    // role === "turn"
+    for (const card of (item as Extract<RawHistoryItem, { role: "turn" }>).agents ?? []) {
+      out.push({
+        id: makeId(),
+        role: "agent" as Role,
+        agent: card.agent,
+        content: card.thought, // 过程专家卡保留思考过程（不再提升为最终答复）
+        status: "done",
+        isStreaming: false,
+        toolCalls: (card.tools ?? []).map((name) => ({
+          id: makeId(),
+          name,
+          status: "completed" as const,
+        })),
+        turn_id: turnId,
+      });
+    }
+    const final_answer = (item as Extract<RawHistoryItem, { role: "turn" }>).final_answer ?? "";
+    if (final_answer) {
+      out.push({
+        id: makeId(),
+        role: "ai" as Role,
+        content: final_answer,
+        isStreaming: false,
+        turn_id: turnId,
+        isFinalAnswer: true,
+      });
+    }
+    turnId += 1;
+  }
+  return out;
 }
 
 export function useChat(
@@ -72,24 +111,27 @@ export function useChat(
     async (content: string) => {
       if (!threadId || !content.trim() || isStreaming) return;
 
+      // 本轮 turn_id：若已有消息则取最大 turn_id + 1，否则从 0 起
+      const turnId =
+        messages.length === 0
+          ? 0
+          : Math.max(...messages.map((m) => m.turn_id ?? -1)) + 1;
+
       const userMsg: ChatMessage = {
         id: makeId(),
         role: "human",
         content: content.trim(),
         timestamp: new Date().toISOString(),
-      };
-      // 兜底 AI 气泡：用于不带 agent 标签的 ai 内容（如 test 旁路、异常降级）
-      const aiMsgId = makeId();
-      const aiMsg: ChatMessage = {
-        id: aiMsgId,
-        role: "ai",
-        content: "",
-        isStreaming: true,
+        turn_id: turnId,
       };
 
-      setMessages((prev) => [...prev, userMsg, aiMsg]);
+      setMessages((prev) => [...prev, userMsg]);
       setIsStreaming(true);
       setError(null);
+
+      // 最终答复气泡 id：到达首个 final 内容（或无 agent 的兜底 ai）时才追加到末尾，
+      // 保证渲染顺序为 user → agent 组 → 最终答复（在“本轮处理”卡片下方）。
+      let finalMsgId: string | null = null;
 
       const request = {
         thread_id: threadId,
@@ -101,10 +143,14 @@ export function useChat(
         prev: ChatMessage[],
         agent: AgentName,
       ): string | null => {
-        // 从末尾向前找最近一个 agent===该值 且 status==="running" 的消息
         for (let i = prev.length - 1; i >= 0; i--) {
           const m = prev[i];
-          if (m.role === "agent" && m.agent === agent && m.status === "running") {
+          if (
+            m.role === "agent" &&
+            m.agent === agent &&
+            m.status === "running" &&
+            m.turn_id === turnId
+          ) {
             return m.id;
           }
         }
@@ -124,12 +170,13 @@ export function useChat(
                 status: "running",
                 isStreaming: true,
                 toolCalls: [],
+                turn_id: turnId,
               };
               setMessages((prev) => [...prev, agentMsg]);
             } else if (ev.event === "agent_end") {
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.role === "agent" && m.agent === ev.agent && m.status === "running"
+                  m.role === "agent" && m.agent === ev.agent && m.status === "running" && m.turn_id === turnId
                     ? { ...m, status: "done", isStreaming: false }
                     : m,
                 ),
@@ -141,7 +188,6 @@ export function useChat(
           if (ev.role === "tool") {
             const toolAgent = ev.agent;
             if (toolAgent) {
-              // 归属某 Agent：追加到该 agent 消息的 toolCalls 数组（供 AgentResponse 展示）
               const call: ToolCall = {
                 id: makeId(),
                 name: ev.tool_name,
@@ -152,34 +198,44 @@ export function useChat(
                   if (
                     m.role === "agent" &&
                     m.agent === toolAgent &&
-                    m.status === "running"
+                    m.status === "running" &&
+                    m.turn_id === turnId
                   ) {
                     return { ...m, toolCalls: [...(m.toolCalls ?? []), call] };
                   }
                   return m;
                 }),
               );
-            } else {
-              // 无 agent 归属（历史兼容）：创建独立 tool 消息
-              const toolMsg: ChatMessage = {
-                id: makeId(),
-                role: "tool",
-                content: "",
-                tool_name: ev.tool_name,
-              };
-              setMessages((prev) => {
-                const aiIdx = prev.findIndex((m) => m.id === aiMsgId);
-                if (aiIdx === -1) return [...prev, toolMsg];
-                const next = [...prev];
-                next.splice(aiIdx, 0, toolMsg);
-                return next;
-              });
             }
           } else if (ev.role === "ai" && ev.content) {
-            if (ev.agent) {
+            const piece = ev.content;
+            if (ev.final || !ev.agent) {
+              // 最终整合输出 / 无 agent 的兜底：进入最终答复气泡
+              if (finalMsgId === null) {
+                const newId = makeId();
+                finalMsgId = newId;
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: newId,
+                    role: "ai",
+                    content: piece,
+                    isStreaming: true,
+                    turn_id: turnId,
+                    isFinalAnswer: true,
+                  },
+                ]);
+              } else {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === finalMsgId
+                      ? { ...m, content: m.content + piece, isFinalAnswer: true }
+                      : m,
+                  ),
+                );
+              }
+            } else {
               const agent = ev.agent;
-              const piece = ev.content;
-              // 追加到对应 agent 的 running 消息
               setMessages((prev) => {
                 const agentId = findRunningAgentMsg(prev, agent);
                 if (agentId) {
@@ -189,7 +245,6 @@ export function useChat(
                       : m,
                   );
                 }
-                // 找不到则新建一个 agent 消息（兜底，正常不会走到）
                 const agentId2 = makeId();
                 const agentMsg: ChatMessage = {
                   id: agentId2,
@@ -199,19 +254,10 @@ export function useChat(
                   status: "running",
                   isStreaming: true,
                   toolCalls: [],
+                  turn_id: turnId,
                 };
                 return [...prev, agentMsg];
               });
-            } else {
-              // 无 agent 标签：追加到兜底 aiMsg
-              const piece = ev.content;
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === aiMsgId
-                    ? { ...m, content: m.content + piece }
-                    : m,
-                ),
-              );
             }
           }
         }
@@ -219,15 +265,29 @@ export function useChat(
         console.error("[useChat] send error:", err);
         const errMsg = (err instanceof Error && err.message) || "调用失败，请重试";
         setError(errMsg);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === aiMsgId
-              ? { ...m, content: m.content || errMsg }
+        setMessages((prev) => {
+          if (finalMsgId === null) {
+            const id = makeId();
+            finalMsgId = id;
+            return [
+              ...prev,
+              {
+                id,
+                role: "ai",
+                content: errMsg,
+                isStreaming: false,
+                turn_id: turnId,
+                isFinalAnswer: true,
+              },
+            ];
+          }
+          return prev.map((m) =>
+            m.id === finalMsgId
+              ? { ...m, content: m.content || errMsg, isFinalAnswer: true }
               : m,
-          ),
-        );
+          );
+        });
       } finally {
-        // 结束所有仍 running 的 agent 消息
         setMessages((prev) =>
           prev.map((m) =>
             m.role === "agent" && m.status === "running"
@@ -235,16 +295,14 @@ export function useChat(
               : m,
           ),
         );
-        // 兜底 aiMsg 若仍空则移除（本次走了 agent 分区路径）
-        setMessages((prev) => {
-          const ai = prev.find((m) => m.id === aiMsgId);
-          if (ai && !ai.content) {
-            return prev.filter((m) => m.id !== aiMsgId);
-          }
-          return prev.map((m) =>
-            m.id === aiMsgId ? { ...m, isStreaming: false } : m,
+        // 最终答复气泡结束流式（可能为 null：全程未收到任何 final/fallback 内容）
+        if (finalMsgId !== null) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === finalMsgId ? { ...m, isStreaming: false } : m,
+            ),
           );
-        });
+        }
         setIsStreaming(false);
         onStreamComplete?.();
       }

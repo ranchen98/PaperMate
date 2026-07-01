@@ -10,12 +10,14 @@ supervisor_model_name: qwen-turbo
 retrieval_model_name: qwen3.7-plus
 writing_model_name: qwen3.7-plus
 review_model_name: qwen3.7-plus
+final_model_name: qwen3.7-plus
 
 # 多 Agent 模型温度（写作偏高，其它偏严谨）
 supervisor_temperature: 0.0
 retrieval_temperature: 0.0
 writing_temperature: 0.7
 review_temperature: 0.0
+final_temperature: 0.3
 
 # Supervisor 死循环保护：单次会话最大路由次数
 supervisor_max_rounds: 12

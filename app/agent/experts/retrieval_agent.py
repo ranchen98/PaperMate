@@ -7,6 +7,7 @@ from langchain.agents import create_agent
 
 from app.agent.model.factory import retrieval_model
 from app.agent.tools.middleware import (
+    make_agent_tag_middleware,
     monitor_before_model,
     monitor_tool,
     summarize_middleware,
@@ -28,6 +29,11 @@ retrieval_agent = create_agent(
         query_paper_metadata,
         web_search,
     ],
-    middleware=[monitor_tool, monitor_before_model, summarize_middleware],
+    middleware=[
+        monitor_tool,
+        monitor_before_model,
+        summarize_middleware,
+        make_agent_tag_middleware("retrieval"),
+    ],
     name="retrieval_agent",
 )
