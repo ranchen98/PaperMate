@@ -8,10 +8,10 @@ from app.business.chat_request import ChatRequest
 from app.business.exceptions import BusinessException
 import json
 
-# 多 Agent 超级图中的专家节点名（Supervisor 不对外输出）
-_EXPERT_NODES = ("retrieval", "writing", "review")
-# 最终整合节点：其 AI 输出为面向用户的最终答复，前端据此提升为主对话框展示
-_FINAL_NODE = "final_assembler"
+# 多 Agent 超级图中的过程专家节点名（Supervisor 不对外输出）
+_EXPERT_NODES = ("pi", "retrieval", "writing")
+# 最终装配节点：其 AI 输出为面向用户的最终答复，前端据此提升为主对话框展示
+_FINAL_NODE = "assembler"
 
 
 class ChatService:
@@ -29,7 +29,7 @@ class ChatService:
 
             for chunk, metadata, namespace in chat_agent.stream(request):
                 # subgraphs=True 格式：(chunk, metadata, namespace)
-                # namespace=() → 父图事件（supervisor / writing / review / final_assembler 函数节点）
+                # namespace=() → 父图事件（supervisor / pi / writing / assembler 函数节点）
                 # namespace=("retrieval:uuid",) → retrieval 子图事件
                 node = metadata.get("langgraph_node") if metadata else None
 
@@ -236,10 +236,10 @@ class ChatService:
                     continue
                 agent = msg.additional_kwargs.get("agent", "")
                 if agent == "final":
-                    # 最终整合输出：直接作为本轮最终答复
+                    # 最终装配输出：直接作为本轮最终答复
                     turn_final_answer = (turn_final_answer + msg.content) if turn_final_answer else msg.content
                     continue
-                if agent in ("retrieval", "writing", "review"):
+                if agent in ("pi", "retrieval", "writing"):
                     if agent not in turn_agent_index:
                         turn_agent_index[agent] = len(turn_agents)
                         turn_agents.append({"agent": agent, "thought": "", "tools": []})
@@ -248,13 +248,13 @@ class ChatService:
                         (turn_agents[idx]["thought"] + msg.content)
                         if turn_agents[idx]["thought"] else msg.content
                     )
-                # 无 agent 标签的 AI：忽略（不应出现，supervisor 路由 JSON 已在流式阶段过滤）
+                # 无 agent 标签的 AI：忽略（不应出现，supervisor FSM 不调 LLM）
                 continue
             if isinstance(msg, ToolMessage):
                 tool_name = msg.name or ""
                 if not tool_name:
                     continue
-                # 工具仅来自检索 Agent
+                # 工具仅来自检索 Agent 子图
                 agent = "retrieval"
                 if agent not in turn_agent_index:
                     turn_agent_index[agent] = len(turn_agents)

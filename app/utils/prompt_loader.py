@@ -29,8 +29,5 @@ def load_retrieval_prompt():
 def load_writing_prompt():
     return _load_prompt("writing_prompt_path")
 
-def load_review_prompt():
-    return _load_prompt("review_prompt_path")
-
-def load_final_prompt():
-    return _load_prompt("final_prompt_path")
+def load_pi_prompt():
+    return _load_prompt("pi_prompt_path")

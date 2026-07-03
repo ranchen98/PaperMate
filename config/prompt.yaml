@@ -3,8 +3,7 @@ system_prompt_path: prompts/system_prompt.txt            # 兼容历史引用（
 summary_prompt_path: prompts/summary_prompt.txt
 
 # 专家 Agent 提示词
-supervisor_prompt_path: prompts/experts/supervisor.txt
+supervisor_prompt_path: prompts/experts/supervisor.txt   # 保留键（supervisor 不再调 LLM）
 retrieval_prompt_path: prompts/experts/retrieval.txt
 writing_prompt_path: prompts/experts/writing.txt
-review_prompt_path: prompts/experts/review.txt
-final_prompt_path: prompts/experts/final.txt
+pi_prompt_path: prompts/experts/pi.txt

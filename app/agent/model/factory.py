@@ -98,8 +98,7 @@ def _role_chat_model(role: str) -> BaseChatModel:
     )
 
 
-supervisor_model = _role_chat_model("supervisor")
+supervisor_model = _role_chat_model("supervisor")   # 保留以兼容旧引用（FSM 不调 LLM）
 retrieval_model = _role_chat_model("retrieval")
 writing_model = _role_chat_model("writing")
-review_model = _role_chat_model("review")
-final_model = _role_chat_model("final")
+pi_model = _role_chat_model("pi")
