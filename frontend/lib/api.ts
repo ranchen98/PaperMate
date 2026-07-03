@@ -1,5 +1,4 @@
 import type {
-  AgentName,
   AuthUser,
   ChatRequest,
   HistoryResponse,
@@ -188,26 +187,15 @@ export async function* streamChat(
         throw new ApiError(500, errMsg);
       }
 
-      // 解析 data 负载（agent_start/agent_end 与 ai/tool 共用 JSON data 体）
       let parsed: {
-        agent?: string;
         role?: string;
         content?: string;
         tool_name?: string;
-        final?: boolean;
       };
       try {
         parsed = JSON.parse(dataLine);
       } catch {
         yield { role: "ai", content: dataLine };
-        continue;
-      }
-
-      if (eventName === "agent_start" || eventName === "agent_end") {
-        yield {
-          event: eventName,
-          agent: parsed.agent as AgentName,
-        } as StreamEvent;
         continue;
       }
 

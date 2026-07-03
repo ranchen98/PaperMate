@@ -9,7 +9,7 @@ from app.business.exceptions import BusinessException
 from app.services.es_service import es_service
 from app.utils.exception_handler import business_exception_handler, global_exception_handler
 from app.utils.logger_handler import logger
-from app.utils.migration_v2_blueprint import run_migration as run_blueprint_migration
+from app.utils.migration_single_agent import run_migration as run_single_agent_migration
 
 
 def _startup_reindex():
@@ -25,11 +25,10 @@ def _startup_reindex():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 一次性蓝图重构迁移：清旧会话/状态，避免旧 MultiAgentState 与新结构冲突
     try:
-        run_blueprint_migration()
+        run_single_agent_migration()
     except Exception as e:
-        logger.error(f"[startup]蓝图迁移失败: {str(e)}", exc_info=True)
+        logger.error(f"[startup]单 Agent 迁移失败: {str(e)}", exc_info=True)
     _startup_reindex()
     yield
 

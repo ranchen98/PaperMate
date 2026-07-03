@@ -8,7 +8,6 @@ import {
 import { ScrollButton } from "@/components/prompt-kit/scroll-button";
 import { Loader } from "@/components/prompt-kit/loader";
 import { ChatMessageItem } from "@/components/chat-message";
-import { AgentTurnGroup } from "@/components/agent-turn-group";
 import type { ChatMessage } from "@/lib/types";
 
 type ChatMessageListProps = {
@@ -27,55 +26,10 @@ function ClientScrollButton() {
   );
 }
 
-/**
- * 把扁平 messages 切分为按 turn_id 分组的渲染单元：
- *   - human 消息 -> ChatMessageItem（气泡）
- *   - 同 turn_id 的连续 agent 消息 -> AgentTurnGroup（折叠组）
- *   - role==="ai" 兜底 / 最终答复 -> ChatMessageItem（主对话气泡）
- * 注意：isFinalSource 标记的 agent 卡不显示正文（已提升为主对话最终答复），
- *       故不在此处重复渲染；AgentTurnGroup 内部的 AgentCard 自行处理。
- */
-type RenderUnit =
-  | { kind: "single"; message: ChatMessage }
-  | { kind: "group"; messages: ChatMessage[] };
-
-function buildRenderUnits(messages: ChatMessage[]): RenderUnit[] {
-  const units: RenderUnit[] = [];
-  let i = 0;
-  while (i < messages.length) {
-    const m = messages[i];
-    if (m.role === "tool") {
-      // 无 agent 归属的兼容态工具行：独立渲染
-      units.push({ kind: "single", message: m });
-      i += 1;
-      continue;
-    }
-    if (m.role !== "agent") {
-      units.push({ kind: "single", message: m });
-      i += 1;
-      continue;
-    }
-    // 聚合同 turn_id 的连续 agent 消息为一组
-    const tid = m.turn_id;
-    const group: ChatMessage[] = [];
-    while (
-      i < messages.length &&
-      messages[i].role === "agent" &&
-      messages[i].turn_id === tid
-    ) {
-      group.push(messages[i]);
-      i += 1;
-    }
-    units.push({ kind: "group", messages: group });
-  }
-  return units;
-}
-
 export function ChatMessageList({
   messages,
   isLoadingHistory,
 }: ChatMessageListProps) {
-  const units = buildRenderUnits(messages);
   return (
     <div className="relative flex-1 overflow-hidden">
       <ChatContainerRoot className="h-full">
@@ -109,19 +63,12 @@ export function ChatMessageList({
               </div>
             </div>
           ) : (
-            units.map((unit, idx) =>
-              unit.kind === "single" ? (
-                <ChatMessageItem
-                  key={unit.message.id}
-                  message={unit.message}
-                />
-              ) : (
-                <AgentTurnGroup
-                  key={`turn-${unit.messages[0]?.turn_id ?? idx}`}
-                  messages={unit.messages}
-                />
-              ),
-            )
+            messages.map((message) => (
+              <ChatMessageItem
+                key={message.id}
+                message={message}
+              />
+            ))
           )}
           <ClientScrollButton />
         </ChatContainerContent>

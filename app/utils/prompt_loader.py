@@ -19,15 +19,3 @@ def load_system_prompts():
 
 def load_summary_prompt():
     return _load_prompt("summary_prompt_path")
-
-def load_supervisor_prompt():
-    return _load_prompt("supervisor_prompt_path")
-
-def load_retrieval_prompt():
-    return _load_prompt("retrieval_prompt_path")
-
-def load_writing_prompt():
-    return _load_prompt("writing_prompt_path")
-
-def load_pi_prompt():
-    return _load_prompt("pi_prompt_path")

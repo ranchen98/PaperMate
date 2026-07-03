@@ -148,5 +148,7 @@ def query_paper_metadata(
     return f"共查询到 {len(rows)} 条记录：\n\n" + "\n\n".join(formatted)
 
 
+tools = [web_search, search_paper_content, get_paper_chunk_context, query_paper_metadata]
+
 if __name__ == "__main__":
     print(get_paper_chunk_context("f99f50e6023cd460035961d342a4ba91", 15, 3, 5000))

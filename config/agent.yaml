@@ -4,26 +4,3 @@ embedding_model_name: text-embedding-v3
 summary_model_name: qwen-turbo
 web_search_max_results: 3
 structured_query_max_limit: 20
-
-# 多 Agent 模型配置（按角色；supervisor 改为确定性 FSM 不再需要模型名，
-#  但保留 supervisor_model_name 键以免破坏旧引用——实际不读取）
-supervisor_model_name: qwen-turbo
-retrieval_model_name: qwen3.7-plus
-writing_model_name: qwen3.7-plus
-pi_model_name: qwen3.7-plus
-
-# 多 Agent 模型温度（写作偏高，其它偏严谨）
-supervisor_temperature: 0.0
-retrieval_temperature: 0.0
-writing_temperature: 0.7
-pi_temperature: 0.3
-
-# Supervisor 兜底：单次会话最大调度步数（每节一次轮转，放宽）
-supervisor_max_rounds: 30
-
-# 写作单节预算上限（字符数硬上限，detail≤2000，overview≤500）
-writing_word_budget_detail: 2000
-writing_word_budget_overview: 500
-
-# 检索结果相关度阈值过滤（hybrid_search score < 阈值则丢弃）
-citation_min_score: 0.05
