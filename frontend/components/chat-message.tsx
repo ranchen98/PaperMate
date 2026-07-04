@@ -61,22 +61,13 @@ export function ChatMessageItem({ message }: ChatMessageItemProps) {
           <div className="whitespace-pre-wrap break-words rounded-lg bg-primary p-2.5 text-primary-foreground">
             {message.content}
           </div>
-        ) : message.isStreaming ? (
-          <div className="rounded-lg bg-secondary p-2.5">
-            <AgentResponse
-              id={message.id}
-              message={message.content}
-              toolCalls={message.toolCalls}
-              isStreaming={true}
-            />
-          </div>
         ) : (
           <div className="rounded-lg bg-secondary p-2.5">
             <AgentResponse
               id={message.id}
               message={message.content}
               toolCalls={message.toolCalls}
-              isStreaming={false}
+              isStreaming={message.isStreaming}
             />
           </div>
         )}

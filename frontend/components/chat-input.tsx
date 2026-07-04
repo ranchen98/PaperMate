@@ -9,14 +9,24 @@ import {
   PromptInputActions,
   PromptInputAction,
 } from "@/components/prompt-kit/prompt-input";
+import { AgentModeToggle } from "@/components/agent-mode-toggle";
+import type { AgentMode } from "@/lib/types";
 
 type ChatInputProps = {
   isStreaming: boolean;
+  mode: AgentMode;
+  onModeChange: (mode: AgentMode) => void;
   onSend: (content: string) => void;
   onStop: () => void;
 };
 
-export function ChatInput({ isStreaming, onSend, onStop }: ChatInputProps) {
+export function ChatInput({
+  isStreaming,
+  mode,
+  onModeChange,
+  onSend,
+  onStop,
+}: ChatInputProps) {
   const [value, setValue] = useState("");
 
   const handleSubmit = () => {
@@ -24,6 +34,11 @@ export function ChatInput({ isStreaming, onSend, onStop }: ChatInputProps) {
     onSend(value);
     setValue("");
   };
+
+  const placeholder =
+    mode === "multi"
+      ? "描述你需要生成的科研报告… (Enter 发送, Shift+Enter 换行)"
+      : "输入消息… (Enter 发送, Shift+Enter 换行)";
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pb-4">
@@ -34,7 +49,14 @@ export function ChatInput({ isStreaming, onSend, onStop }: ChatInputProps) {
         isLoading={isStreaming}
         className="rounded-2xl"
       >
-        <PromptInputTextarea placeholder="输入消息… (Enter 发送, Shift+Enter 换行)" />
+        <div className="flex items-center justify-between px-2 pt-1">
+          <AgentModeToggle
+            mode={mode}
+            onModeChange={onModeChange}
+            disabled={isStreaming}
+          />
+        </div>
+        <PromptInputTextarea placeholder={placeholder} />
         <PromptInputActions className="justify-end">
           {isStreaming ? (
             <Button

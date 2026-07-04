@@ -40,6 +40,7 @@ def _init_tables(connection):
             create_time    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             latest_message TEXT      DEFAULT '',
             update_time    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            agent_mode     TEXT      NOT NULL DEFAULT 'single',
             PRIMARY KEY (user_id, thread_id)
         )
         """
@@ -50,6 +51,13 @@ def _init_tables(connection):
         ON user_thread (user_id)
         """
     )
+    # 轻量迁移：为 user_thread 追加 agent_mode 列（兼容已有库）
+    cursor.execute("PRAGMA table_info(user_thread)")
+    ut_cols = {row[1] for row in cursor.fetchall()}
+    if "agent_mode" not in ut_cols:
+        cursor.execute(
+            "ALTER TABLE user_thread ADD COLUMN agent_mode TEXT NOT NULL DEFAULT 'single'"
+        )
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS paper_file (

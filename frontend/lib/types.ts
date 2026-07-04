@@ -1,5 +1,7 @@
 export type Role = "human" | "ai" | "tool";
 
+export type AgentMode = "single" | "multi";
+
 export type ToolCall = {
   id: string;
   name: string;
@@ -23,12 +25,14 @@ export type Thread = {
   thread_id: string;
   latest_message: string;
   update_time: string;
+  agent_mode?: AgentMode;
 };
 
 export type ChatRequest = {
   thread_id: string;
   message: string;
   user_id: string;
+  agent_mode: AgentMode;
 };
 
 export type RawHistoryItem =

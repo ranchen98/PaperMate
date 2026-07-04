@@ -13,7 +13,7 @@ class ChatService:
     def chat_streaming_response(self, request: ChatRequest):
         try:
             logger.info(f"[chat_streaming_response]: {str(request)}")
-            self._ensure_thread_record(request.user_id, request.thread_id, request.message)
+            self._ensure_thread_record(request.user_id, request.thread_id, request.message, request.agent_mode)
             seen_tool_indices: set[int] = set()
 
             for chunk, metadata in chat_agent.stream(request):
@@ -45,7 +45,8 @@ class ChatService:
         logger.info(f"[get_thread_ids]: {user_id}")
         cursor = db_connection.cursor()
         cursor.execute(
-            "SELECT thread_id, latest_message, update_time FROM user_thread WHERE user_id = ? ORDER BY update_time DESC",
+            "SELECT thread_id, latest_message, update_time, agent_mode "
+            "FROM user_thread WHERE user_id = ? ORDER BY update_time DESC",
             (user_id,)
         )
         rows = cursor.fetchall()
@@ -54,6 +55,7 @@ class ChatService:
                 "thread_id": row["thread_id"],
                 "latest_message": row["latest_message"] or "",
                 "update_time": (row["update_time"].replace(" ", "T") + "Z") if row["update_time"] else "",
+                "agent_mode": row["agent_mode"] or "single",
             }
             for row in rows
         ]
@@ -75,7 +77,7 @@ class ChatService:
             raise BusinessException(403, "无权访问该会话")
         return True
 
-    def _ensure_thread_record(self, user_id: str, thread_id: str, message: str):
+    def _ensure_thread_record(self, user_id: str, thread_id: str, message: str, agent_mode: str = "single"):
         latest_message = (message or "")[:40]
         cursor = db_connection.cursor()
         cursor.execute(
@@ -84,14 +86,18 @@ class ChatService:
         )
         if cursor.fetchone() is None:
             cursor.execute(
-                "INSERT INTO user_thread (user_id, thread_id, latest_message, update_time) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
-                (user_id, thread_id, latest_message)
+                "INSERT INTO user_thread (user_id, thread_id, latest_message, update_time, agent_mode) "
+                "VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)",
+                (user_id, thread_id, latest_message, agent_mode)
             )
-            logger.info(f"[ensure_thread_record] insert new thread: user_id={user_id}, thread_id={thread_id}")
+            logger.info(
+                f"[ensure_thread_record] insert new thread: user_id={user_id}, thread_id={thread_id}, agent_mode={agent_mode}"
+            )
         else:
             cursor.execute(
-                "UPDATE user_thread SET latest_message = ?, update_time = CURRENT_TIMESTAMP WHERE user_id = ? AND thread_id = ?",
-                (latest_message, user_id, thread_id)
+                "UPDATE user_thread SET latest_message = ?, update_time = CURRENT_TIMESTAMP, agent_mode = ? "
+                "WHERE user_id = ? AND thread_id = ?",
+                (latest_message, agent_mode, user_id, thread_id)
             )
         db_connection.commit()
 

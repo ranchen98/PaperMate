@@ -12,6 +12,7 @@ import { useAuth } from "@/components/auth-provider";
 import { useThreads } from "@/hooks/use-threads";
 import { useChat } from "@/hooks/use-chat";
 import { usePapers } from "@/hooks/use-papers";
+import type { AgentMode } from "@/lib/types";
 
 export default function Home() {
   const router = useRouter();
@@ -77,6 +78,13 @@ function AppContent({
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [view, setView] = useState<SidebarView>("chat");
+  const [agentMode, setAgentMode] = useState<AgentMode>("single");
+
+  useEffect(() => {
+    if (!currentThreadId) return;
+    const t = threads.find((it) => it.thread_id === currentThreadId);
+    if (t?.agent_mode) setAgentMode(t.agent_mode);
+  }, [currentThreadId, threads]);
 
   useEffect(() => {
     if (view === "chat" && !isLoadingThreads && !currentThreadId) {
@@ -180,7 +188,9 @@ function AppContent({
 
             <ChatInput
               isStreaming={isStreaming}
-              onSend={sendMessage}
+              mode={agentMode}
+              onModeChange={setAgentMode}
+              onSend={(content) => sendMessage(content, agentMode)}
               onStop={stopStreaming}
             />
           </>

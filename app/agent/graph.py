@@ -30,4 +30,4 @@ def build_agent():
     return agent
 
 
-multi_agent_graph = build_agent()
+single_agent_graph = build_agent()

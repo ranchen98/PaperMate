@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchHistory, streamChat } from "@/lib/api";
-import type { ChatMessage, RawHistoryItem, Role, StreamEvent, ToolCall } from "@/lib/types";
+import type { AgentMode, ChatMessage, RawHistoryItem, Role, StreamEvent, ToolCall } from "@/lib/types";
 
 let msgSeq = 0;
 function makeId() {
@@ -89,7 +89,7 @@ export function useChat(
   }, [threadId]);
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, mode: AgentMode = "single") => {
       if (!threadId || !content.trim() || isStreaming) return;
 
       const userMsg: ChatMessage = {
@@ -105,78 +105,70 @@ export function useChat(
 
       let aiMsgId: string | null = null;
 
+      const ensureAiMsg = (): string => {
+        if (aiMsgId !== null) return aiMsgId;
+        const newId = makeId();
+        aiMsgId = newId;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: newId,
+            role: "ai",
+            content: "",
+            isStreaming: true,
+            toolCalls: [],
+          },
+        ]);
+        return newId;
+      };
+
       const request = {
         thread_id: threadId,
         message: content.trim(),
         user_id: userId,
+        agent_mode: mode,
       };
 
       try {
         for await (const ev of streamChat(request)) {
           if (ev.role === "tool") {
+            const id = ensureAiMsg();
             const call: ToolCall = {
               id: makeId(),
               name: ev.tool_name,
               status: "completed",
             };
             setMessages((prev) =>
-              prev.map((m) => {
-                if (m.id === aiMsgId) {
-                  return { ...m, toolCalls: [...(m.toolCalls ?? []), call] };
-                }
-                return m;
-              }),
+              prev.map((m) =>
+                m.id === id
+                  ? { ...m, toolCalls: [...(m.toolCalls ?? []), call] }
+                  : m,
+              ),
             );
           } else if (ev.role === "ai" && ev.content) {
             const piece = ev.content;
-            if (aiMsgId === null) {
-              const newId = makeId();
-              aiMsgId = newId;
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id: newId,
-                  role: "ai",
-                  content: piece,
-                  isStreaming: true,
-                },
-              ]);
-            } else {
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === aiMsgId
-                    ? { ...m, content: m.content + piece }
-                    : m,
-                ),
-              );
-            }
+            const id = ensureAiMsg();
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === id
+                  ? { ...m, content: m.content + piece }
+                  : m,
+              ),
+            );
           }
         }
       } catch (err) {
         console.error("[useChat] send error:", err);
         const errMsg = (err instanceof Error && err.message) || "调用失败，请重试";
         setError(errMsg);
-        if (aiMsgId === null) {
-          const id = makeId();
-          aiMsgId = id;
-          setMessages((prev) => [
-            ...prev,
-            {
-              id,
-              role: "ai",
-              content: errMsg,
-              isStreaming: false,
-            },
-          ]);
-        } else {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === aiMsgId
-                ? { ...m, content: m.content || errMsg }
-                : m,
-            ),
-          );
-        }
+        const id = ensureAiMsg();
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === id
+              ? { ...m, content: m.content || errMsg }
+              : m,
+          ),
+        );
       } finally {
         if (aiMsgId !== null) {
           setMessages((prev) =>
