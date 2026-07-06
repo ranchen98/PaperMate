@@ -11,6 +11,19 @@ export type ToolCall = {
   duration?: number;
 };
 
+export type AgentCardSection = {
+  sectionId?: string;
+  sectionTitle?: string;
+  content: string;
+  thinking?: string;
+};
+
+export type AgentCard = {
+  agent: string;
+  sections: AgentCardSection[];
+  status: "running" | "done";
+};
+
 export type ChatMessage = {
   id: string;
   role: Role;
@@ -19,6 +32,9 @@ export type ChatMessage = {
   tool_name?: string;
   isStreaming?: boolean;
   toolCalls?: ToolCall[];
+  thinking?: string;
+  agentCards?: AgentCard[];
+  isReportReady?: boolean;
 };
 
 export type Thread = {
@@ -42,12 +58,22 @@ export type RawHistoryItem =
       turn_id: number;
       tools: string[];
       ai_content: string;
+      thinking?: string;
+      is_multi?: boolean;
+      agent_messages?: {
+        agent: string;
+        section_id?: string;
+        section_title?: string;
+        content: string;
+      }[];
+      report_ready?: boolean;
     };
 
 export type HistoryResponse = RawHistoryItem[];
 
 export type StreamEvent =
-  | { role: "ai"; content: string }
+  | { role: "ai"; content: string; agent?: string; section_id?: string; section_title?: string }
+  | { role: "thinking"; content: string; agent?: string; section_id?: string; section_title?: string }
   | { role: "tool"; tool_name: string };
 
 export type ThreadListResponse = Thread[];

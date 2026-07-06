@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from app.api.deps import require_user
 from app.business.chat_request import ChatRequest
 from app.business.user import User
 from app.services.chat_service import chat_service
+from app.utils.logger_handler import logger
 
 router = APIRouter()
 
@@ -32,6 +33,26 @@ async def get_history(thread_id: str, user: User = Depends(require_user)):
         "data": chat_service.get_history(user.user_id, thread_id)
     }
 
+@router.get("/chat/download_report")
+async def download_report(thread_id: str, user: User = Depends(require_user)):
+    """下载最终报告为 Markdown 文件"""
+    try:
+        content, filename = chat_service.download_report(user.user_id, thread_id)
+        encoded_filename = filename.encode("utf-8").decode("latin-1")
+        return Response(
+            content=content,
+            media_type="text/markdown; charset=utf-8",
+            headers={
+                "Content-Disposition": f"attachment; filename=\"{encoded_filename}\"; filename*=UTF-8''{filename}"
+            },
+        )
+    except Exception as e:
+        logger.error(f"[download_report] 下载失败: {e}")
+        return {
+            "code": 404,
+            "message": str(e) or "报告下载失败",
+            "data": None,
+        }
 @router.get("/chat/get_thread_ids")
 async def get_thread_ids(user: User = Depends(require_user)):
     """查询当前登录用户的所有 thread_id 列表"""

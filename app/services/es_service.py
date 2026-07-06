@@ -6,6 +6,7 @@ from langchain_core.documents import Document
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 
 from app.agent.model.factory import embedding_model
+from app.services.paper_metadata_service import _collect_front_matter, extract_metadata, save_metadata
 from app.utils.config_handler import es_config, env
 from app.utils.db_handler import db_connection
 from app.utils.file_handler import md_loader
@@ -130,6 +131,16 @@ class EsService:
                 if not split_documents:
                     logger.warning(f"[加载知识库]{file_name} split后无有效内容，skip")
                     continue
+
+                try:
+                    front_matter = _collect_front_matter(header_chunks)
+                    if front_matter.strip():
+                        metadata = extract_metadata(front_matter)
+                        save_metadata(file_id, user_id, metadata)
+                    else:
+                        logger.warning(f"[加载知识库]{file_name} 首页文本为空，跳过元数据提取")
+                except Exception as e:
+                    logger.warning(f"[加载知识库]{file_name} 元数据提取失败: {str(e)}")
 
                 for idx, doc in enumerate(split_documents):
                     doc.metadata["file_id"] = file_id

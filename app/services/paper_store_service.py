@@ -129,6 +129,7 @@ class PaperStoreService:
         if row["is_md_parsed"]:
             self._safe_rmtree(os.path.join(MD_DIR, file_id), "md 文件夹")
 
+        cursor.execute("DELETE FROM paper_metadata WHERE file_id = ?", (file_id,))
         cursor.execute("DELETE FROM paper_file WHERE file_id = ?", (file_id,))
         db_connection.commit()
         logger.info(f"[delete_file]文件记录已删除 file_id={file_id}")
@@ -212,6 +213,17 @@ class PaperStoreService:
         cursor = db_connection.cursor()
         cursor.execute(sql, params)
         return [dict(row) for row in cursor.fetchall()]
+
+
+    def get_paper_metadata(self, file_id: str, user_id: str) -> dict | None:
+        cursor = db_connection.cursor()
+        cursor.execute(
+            "SELECT title, authors, affiliations, journal, publication_date, "
+            "keywords, abstract, doi FROM paper_metadata WHERE file_id = ? AND user_id = ?",
+            (file_id, user_id),
+        )
+        row = cursor.fetchone()
+        return dict(row) if row else None
 
 
 paper_store_service = PaperStoreService()

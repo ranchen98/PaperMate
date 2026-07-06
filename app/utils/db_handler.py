@@ -106,6 +106,27 @@ def _init_tables(connection):
             "ALTER TABLE paper_file ADD COLUMN is_indexed INTEGER DEFAULT 0"
         )
 
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS paper_metadata (
+            file_id             TEXT PRIMARY KEY,
+            user_id             TEXT NOT NULL,
+            title               TEXT DEFAULT '',
+            authors             TEXT DEFAULT '[]',
+            affiliations        TEXT DEFAULT '[]',
+            journal             TEXT DEFAULT '',
+            publication_date    TEXT DEFAULT '',
+            keywords            TEXT DEFAULT '[]',
+            abstract            TEXT DEFAULT '',
+            doi                 TEXT DEFAULT '',
+            extra               TEXT DEFAULT '{}',
+            create_time         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            update_time         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (file_id) REFERENCES paper_file(file_id)
+        )
+        """
+    )
+
     connection.commit()
 
 db_connection = _create_connection()

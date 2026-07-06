@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Menu, Trash2, Loader2 } from "lucide-react";
+import { Menu, Trash2, Loader2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatSidebar, type SidebarView } from "@/components/chat-sidebar";
 import { ChatMessageList } from "@/components/chat-message-list";
@@ -12,6 +12,7 @@ import { useAuth } from "@/components/auth-provider";
 import { useThreads } from "@/hooks/use-threads";
 import { useChat } from "@/hooks/use-chat";
 import { usePapers } from "@/hooks/use-papers";
+import { downloadReport } from "@/lib/api";
 import type { AgentMode } from "@/lib/types";
 
 export default function Home() {
@@ -79,6 +80,7 @@ function AppContent({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [view, setView] = useState<SidebarView>("chat");
   const [agentMode, setAgentMode] = useState<AgentMode>("single");
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     if (!currentThreadId) return;
@@ -122,6 +124,23 @@ function AppContent({
   const currentThread = threads.find((t) => t.thread_id === currentThreadId);
   const headerTitle = currentThread?.latest_message || "新对话";
 
+  const handleDownload = async () => {
+    if (!currentThreadId || downloading) return;
+    setDownloading(true);
+    try {
+      await downloadReport(currentThreadId);
+    } catch (err) {
+      console.error("[download] error:", err);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const showDownload =
+    agentMode === "multi" &&
+    !isStreaming &&
+    messages.length > 0;
+
   return (
     <div className="flex h-dvh w-full overflow-hidden">
       <ChatSidebar
@@ -164,14 +183,31 @@ function AppContent({
                 <h1 className="truncate text-sm font-medium">{headerTitle}</h1>
               </div>
               {currentThreadId && (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={handleDeleteCurrent}
-                  title="删除当前对话"
-                >
-                  <Trash2 className="text-destructive" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  {showDownload && (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={handleDownload}
+                      disabled={downloading}
+                      title="下载 Markdown 报告"
+                    >
+                      {downloading ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Download className="size-4" />
+                      )}
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={handleDeleteCurrent}
+                    title="删除当前对话"
+                  >
+                    <Trash2 className="text-destructive" />
+                  </Button>
+                </div>
               )}
             </header>
 
@@ -184,6 +220,7 @@ function AppContent({
             <ChatMessageList
               messages={messages}
               isLoadingHistory={isLoadingHistory}
+              onDownload={handleDownload}
             />
 
             <ChatInput

@@ -8,11 +8,17 @@ import {
   Wrench,
 } from "lucide-react"
 import { Markdown } from "@/components/prompt-kit/markdown"
+import {
+  Reasoning,
+  ReasoningTrigger,
+  ReasoningContent,
+} from "@/components/prompt-kit/reasoning"
 import type { ToolCall } from "@/lib/types"
 import { getToolDisplayName } from "@/lib/tool-names"
 
 export interface AgentResponseProps {
   message: string
+  thinking?: string
   toolCalls?: ToolCall[]
   isStreaming?: boolean
   id?: string
@@ -23,6 +29,7 @@ export interface AgentResponseProps {
 
 export function AgentResponse({
   message,
+  thinking,
   toolCalls = [],
   isStreaming = false,
   id,
@@ -32,6 +39,20 @@ export function AgentResponse({
 }: AgentResponseProps) {
   return (
     <div className={cn("space-y-3", className)}>
+      {/* Thinking Process */}
+      {thinking && (
+        <Reasoning isStreaming={isStreaming}>
+          <ReasoningTrigger className="text-xs text-muted-foreground">
+            思考过程
+          </ReasoningTrigger>
+          <ReasoningContent className="max-h-40 overflow-y-auto">
+            <div className="text-xs italic whitespace-pre-wrap break-words">
+              {thinking}
+            </div>
+          </ReasoningContent>
+        </Reasoning>
+      )}
+
       {/* Tool Calls */}
       {toolCalls.length > 0 && (
         <div className="space-y-1.5">
@@ -55,7 +76,7 @@ export function AgentResponse({
             <span className="inline-block w-1 h-4 bg-foreground animate-pulse ml-1" />
           )}
         </div>
-      ) : isStreaming ? (
+      ) : isStreaming && !thinking ? (
         <div className="text-sm text-muted-foreground animate-pulse">
           thinking...
         </div>

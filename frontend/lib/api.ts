@@ -115,6 +115,29 @@ export async function uploadPapers(
   return body.data as PaperFile[];
 }
 
+export async function downloadReport(threadId: string): Promise<void> {
+  const res = await fetch(
+    `/chat/download_report?thread_id=${encodeURIComponent(threadId)}`,
+    { credentials: "same-origin" },
+  );
+  if (!res.ok) {
+    if (res.status === 401) notifyUnauthorized();
+    throw new ApiError(res.status, "下载失败");
+  }
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition") || "";
+  const match = disposition.match(/filename\*=UTF-8''(.+)/);
+  const filename = match ? decodeURIComponent(match[1]) : "report.md";
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export async function deletePaper(fileId: string): Promise<void> {
   const res = await fetch(`/paper/files/${encodeURIComponent(fileId)}`, {
     method: "DELETE",

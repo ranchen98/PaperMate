@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchHistory, streamChat } from "@/lib/api";
-import type { AgentMode, ChatMessage, RawHistoryItem, Role, StreamEvent, ToolCall } from "@/lib/types";
+import type {
+  AgentCard,
+  AgentCardSection,
+  AgentMode,
+  ChatMessage,
+  RawHistoryItem,
+  Role,
+  ToolCall,
+} from "@/lib/types";
 
 let msgSeq = 0;
 function makeId() {
@@ -22,28 +30,114 @@ function adaptHistory(items: RawHistoryItem[]): ChatMessage[] {
       continue;
     }
     const turn = item as Extract<RawHistoryItem, { role: "turn" }>;
-    if (turn.tools && turn.tools.length > 0) {
+
+    if (turn.is_multi && turn.agent_messages) {
+      const cards: AgentCard[] = [];
+      for (const am of turn.agent_messages) {
+        const agentName = am.agent || "unknown";
+        let card = cards.find((c) => c.agent === agentName);
+        if (!card) {
+          card = { agent: agentName, sections: [], status: "done" };
+          cards.push(card);
+        }
+        const sectionId = am.section_id || undefined;
+        let section: AgentCardSection | undefined = sectionId
+          ? card.sections.find((s) => s.sectionId === sectionId)
+          : card.sections[0];
+        if (!section) {
+          section = {
+            sectionId,
+            sectionTitle: am.section_title || undefined,
+            content: am.content,
+          };
+          card.sections.push(section);
+        } else {
+          section.content += am.content;
+        }
+      }
       out.push({
         id: makeId(),
         role: "ai" as Role,
-        content: turn.ai_content ?? "",
+        content: "",
         isStreaming: false,
-        toolCalls: turn.tools.map((name) => ({
+        agentCards: cards,
+        isReportReady: turn.report_ready,
+      });
+    } else {
+      const toolCalls: ToolCall[] | undefined =
+        turn.tools && turn.tools.length > 0
+          ? turn.tools.map((name) => ({
+              id: makeId(),
+              name,
+              status: "completed" as const,
+            }))
+          : undefined;
+      if (toolCalls || turn.ai_content) {
+        out.push({
           id: makeId(),
-          name,
-          status: "completed" as const,
-        })),
-      });
-    } else if (turn.ai_content) {
-      out.push({
-        id: makeId(),
-        role: "ai" as Role,
-        content: turn.ai_content,
-        isStreaming: false,
-      });
+          role: "ai" as Role,
+          content: turn.ai_content ?? "",
+          thinking: turn.thinking,
+          isStreaming: false,
+          toolCalls,
+        });
+      }
     }
   }
   return out;
+}
+
+function updateCardField(
+  cards: AgentCard[],
+  agentName: string,
+  sectionId: string | undefined,
+  sectionTitle: string | undefined,
+  content: string,
+  isThinking: boolean,
+): AgentCard[] {
+  const newCards = [...cards];
+  let cardIdx = newCards.findIndex((c) => c.agent === agentName);
+
+  if (cardIdx === -1) {
+    for (let i = 0; i < newCards.length; i++) {
+      if (newCards[i].status === "running") {
+        newCards[i] = { ...newCards[i], status: "done" as const };
+      }
+    }
+    const section: AgentCardSection = {
+      sectionId: sectionId || undefined,
+      sectionTitle: sectionTitle || undefined,
+      content: isThinking ? "" : content,
+      thinking: isThinking ? content : undefined,
+    };
+    newCards.push({ agent: agentName, sections: [section], status: "running" });
+  } else {
+    const card = { ...newCards[cardIdx] };
+    const sections = [...card.sections];
+    let secIdx = sectionId
+      ? sections.findIndex((s) => s.sectionId === sectionId)
+      : 0;
+    if (secIdx === -1) {
+      sections.push({
+        sectionId: sectionId || undefined,
+        sectionTitle: sectionTitle || undefined,
+        content: isThinking ? "" : content,
+        thinking: isThinking ? content : undefined,
+      });
+    } else {
+      const sec = { ...sections[secIdx] };
+      if (isThinking) {
+        sec.thinking = (sec.thinking || "") + content;
+      } else {
+        sec.content = sec.content + content;
+      }
+      sections[secIdx] = sec;
+    }
+    card.sections = sections;
+    newCards[cardIdx] = card;
+  }
+
+  return newCards;
 }
 
 export function useChat(
@@ -145,16 +239,72 @@ export function useChat(
                   : m,
               ),
             );
+          } else if (ev.role === "thinking" && ev.content) {
+            const piece = ev.content;
+            const id = ensureAiMsg();
+            const agentName = ev.agent;
+            const sectionId = ev.section_id || undefined;
+            const sectionTitle = ev.section_title || undefined;
+
+            if (mode === "multi" && agentName) {
+              setMessages((prev) =>
+                prev.map((m) => {
+                  if (m.id !== id) return m;
+                  return {
+                    ...m,
+                    agentCards: updateCardField(
+                      m.agentCards ?? [],
+                      agentName,
+                      sectionId,
+                      sectionTitle,
+                      piece,
+                      true,
+                    ),
+                  };
+                }),
+              );
+            } else {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === id
+                    ? { ...m, thinking: (m.thinking ?? "") + piece }
+                    : m,
+                ),
+              );
+            }
           } else if (ev.role === "ai" && ev.content) {
             const piece = ev.content;
             const id = ensureAiMsg();
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === id
-                  ? { ...m, content: m.content + piece }
-                  : m,
-              ),
-            );
+            const agentName = ev.agent;
+            const sectionId = ev.section_id || undefined;
+            const sectionTitle = ev.section_title || undefined;
+
+            if (mode === "multi" && agentName) {
+              setMessages((prev) =>
+                prev.map((m) => {
+                  if (m.id !== id) return m;
+                  return {
+                    ...m,
+                    agentCards: updateCardField(
+                      m.agentCards ?? [],
+                      agentName,
+                      sectionId,
+                      sectionTitle,
+                      piece,
+                      false,
+                    ),
+                  };
+                }),
+              );
+            } else {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === id
+                    ? { ...m, content: m.content + piece }
+                    : m,
+                ),
+              );
+            }
           }
         }
       } catch (err) {
@@ -172,9 +322,21 @@ export function useChat(
       } finally {
         if (aiMsgId !== null) {
           setMessages((prev) =>
-            prev.map((m) =>
-              m.id === aiMsgId ? { ...m, isStreaming: false } : m,
-            ),
+            prev.map((m) => {
+              if (m.id !== aiMsgId) return m;
+              if (mode === "multi") {
+                return {
+                  ...m,
+                  isStreaming: false,
+                  isReportReady: true,
+                  agentCards: m.agentCards?.map((c) => ({
+                    ...c,
+                    status: "done" as const,
+                  })),
+                };
+              }
+              return { ...m, isStreaming: false };
+            }),
           );
         }
         setIsStreaming(false);

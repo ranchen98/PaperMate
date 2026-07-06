@@ -1,6 +1,8 @@
-chat_model_name: qwen3.7-plus
+chat_model_name: qwen3.7-max-2026-06-08
 chat_model_provider: openai
-embedding_model_name: text-embedding-v3
+embedding_model_name: text-embedding-v4
 summary_model_name: qwen-turbo
+paper_metadata_extraction_model_name: qwen-turbo
 web_search_max_results: 3
 structured_query_max_limit: 20
+multi_agent_token_budget: 12000

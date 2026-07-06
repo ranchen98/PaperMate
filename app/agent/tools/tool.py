@@ -1,3 +1,5 @@
+import json
+
 from langchain.tools import tool
 from langchain_core.runnables import ensure_config
 from langchain_tavily import TavilySearch
@@ -108,8 +110,10 @@ def query_paper_metadata(
 ) -> str:
     """
     结构化检索知识库中论文文件的元数据（文件列表/主题/上传时间/解析与入库状态等），数据来源于结构化数据库的 paper_file 表。
+    当通过 file_id 精确查询到单篇论文时，自动额外返回论文的结构化信息：标题、作者、机构、期刊、出版日期、关键词、摘要、DOI。
     【适用场景】用户提出"结构化查询"，想获取论文文件的属性信息时使用。
       示例："我上传了哪些论文""关于xx主题的论文有几篇""文件名含transformer的论文""xxx解析完了吗""哪些论文已入库可被检索"。
+      也可用于了解单篇论文的详细信息：如"这篇论文的作者是谁""这篇论文发表在哪个期刊""这篇论文的DOI是什么""这篇论文的摘要"。
     【不适用场景】①想了解论文正文中的概念/方法/实验细节等"内容"时（应使用 search_paper_content 做语义/关键词检索）；
       ②实时外部资讯（应使用 web_search）。
     【过滤方式】各参数均为可选过滤条件，留空表示不限制；可组合使用。
@@ -129,6 +133,12 @@ def query_paper_metadata(
     if not rows:
         return "未查询到符合条件的论文文件记录。建议：1. 确认是否已上传相关论文；2. 调整过滤条件后重试。"
 
+    metadata = None
+    if len(rows) == 1:
+        fid = rows[0].get("file_id", "")
+        if fid:
+            metadata = paper_store_service.get_paper_metadata(fid, user_id)
+
     formatted = []
     for i, row in enumerate(rows):
         is_indexed = row.get("is_indexed")
@@ -139,11 +149,57 @@ def query_paper_metadata(
             status = "已解析待入库（暂不可检索，稍后自动入库）"
         else:
             status = "解析中/未解析（MinerU 处理中或失败）"
-        formatted.append(
+
+        base = (
             f"[文件 {i + 1}] file_id: {row.get('file_id', '')} | "
             f"文件名: {row.get('file_name', '')} | 主题: {row.get('topic') or '(未设置)'} | "
             f"状态: {status} | 上传时间: {row.get('upload_time', '')} | 更新时间: {row.get('update_time', '')}"
         )
+
+        if metadata:
+            title = metadata.get("title", "")
+            authors_str = metadata.get("authors", "[]")
+            journal = metadata.get("journal", "")
+            pub_date = metadata.get("publication_date", "")
+            keywords_str = metadata.get("keywords", "[]")
+            abstract = metadata.get("abstract", "")
+            doi = metadata.get("doi", "")
+
+            try:
+                authors = json.loads(authors_str)
+            except (json.JSONDecodeError, TypeError):
+                authors = []
+            try:
+                keywords = json.loads(keywords_str)
+            except (json.JSONDecodeError, TypeError):
+                keywords = []
+
+            extra = []
+            if title:
+                extra.append(f"标题: {title}")
+            if authors:
+                extra.append(f"作者: {', '.join(authors)}")
+            affiliations_str = metadata.get("affiliations", "[]")
+            try:
+                affiliations = json.loads(affiliations_str)
+            except (json.JSONDecodeError, TypeError):
+                affiliations = []
+            if affiliations:
+                extra.append(f"机构: {'; '.join(affiliations)}")
+            if journal:
+                extra.append(f"期刊: {journal}")
+            if pub_date:
+                extra.append(f"出版日期: {pub_date}")
+            if keywords:
+                extra.append(f"关键词: {', '.join(keywords)}")
+            if abstract:
+                extra.append(f"摘要: {abstract}")
+            if doi:
+                extra.append(f"DOI: {doi}")
+            if extra:
+                base = base + "\n  " + "\n  ".join(extra)
+
+        formatted.append(base)
 
     return f"共查询到 {len(rows)} 条记录：\n\n" + "\n\n".join(formatted)
 

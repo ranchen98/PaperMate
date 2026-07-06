@@ -7,6 +7,7 @@ import { Loader } from "@/components/prompt-kit/loader";
 import { Bot, User } from "lucide-react";
 import type { ChatMessage } from "@/lib/types";
 import { AgentResponse } from "@/components/agents-ui/agent-response";
+import { AgentCards } from "@/components/agents-ui/agent-cards";
 
 function formatTime(ts: string): string {
   const num = Number(ts);
@@ -21,12 +22,14 @@ function formatTime(ts: string): string {
 
 type ChatMessageItemProps = {
   message: ChatMessage;
+  onDownload?: () => void;
 };
 
-export function ChatMessageItem({ message }: ChatMessageItemProps) {
+export function ChatMessageItem({ message, onDownload }: ChatMessageItemProps) {
   const isHuman = message.role === "human";
   const hasToolCalls = (message.toolCalls?.length ?? 0) > 0;
-  const showLoader = message.isStreaming && !message.content && !hasToolCalls;
+  const isMultiAgent = (message.agentCards?.length ?? 0) > 0;
+  const showLoader = message.isStreaming && !message.content && !hasToolCalls && !isMultiAgent;
 
   return (
     <div
@@ -61,11 +64,20 @@ export function ChatMessageItem({ message }: ChatMessageItemProps) {
           <div className="whitespace-pre-wrap break-words rounded-lg bg-primary p-2.5 text-primary-foreground">
             {message.content}
           </div>
+        ) : isMultiAgent ? (
+          <div className="rounded-lg bg-secondary p-2.5 w-full max-w-full">
+            <AgentCards
+              cards={message.agentCards!}
+              isReportReady={message.isReportReady}
+              onDownload={onDownload}
+            />
+          </div>
         ) : (
           <div className="rounded-lg bg-secondary p-2.5">
             <AgentResponse
               id={message.id}
               message={message.content}
+              thinking={message.thinking}
               toolCalls={message.toolCalls}
               isStreaming={message.isStreaming}
             />

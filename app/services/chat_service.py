@@ -20,6 +20,34 @@ class ChatService:
                 if isinstance(chunk, AIMessage):
                     if metadata.get("lc_source") == "summarization":
                         continue
+
+                    agent_name = metadata.get("agent", "")
+                    event_type = metadata.get("type", "")
+
+                    # 多 Agent thinking（来自 custom 流）
+                    if event_type == "thinking":
+                        if chunk.content:
+                            payload = {
+                                "role": "thinking",
+                                "content": chunk.content,
+                                "agent": agent_name,
+                                "section_id": metadata.get("section_id", ""),
+                                "section_title": metadata.get("section_title", ""),
+                            }
+                            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+                        continue
+
+                    # 单 Agent thinking（来自模型 additional_kwargs / response_metadata）
+                    ak = chunk.additional_kwargs or {}
+                    thinking = (
+                        ak.get("reasoning_content", "")
+                        or ak.get("reasoning", "")
+                    )
+                    if thinking:
+                        payload = {"role": "thinking", "content": thinking}
+                        yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+                    # 常规内容
                     if chunk.content:
                         content = chunk.content
                         if isinstance(content, list):
@@ -27,8 +55,16 @@ class ChatService:
                                 b.get("text", "") if isinstance(b, dict) else str(b)
                                 for b in content
                             )
-                        payload = {"role": "ai", "content": content}
+                        payload = {
+                            "role": "ai",
+                            "content": content,
+                            "agent": agent_name,
+                            "section_id": metadata.get("section_id", ""),
+                            "section_title": metadata.get("section_title", ""),
+                        }
                         yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+                    # tool_call_chunks
                     for tc in getattr(chunk, "tool_call_chunks", []) or []:
                         idx = tc.get("index")
                         name = tc.get("name")
@@ -106,12 +142,20 @@ class ChatService:
         owned = self._assert_own_thread(user_id, thread_id)
         if not owned:
             return []
+
+        cursor = db_connection.cursor()
+        cursor.execute("SELECT agent_mode FROM user_thread WHERE thread_id = ?", (thread_id,))
+        row = cursor.fetchone()
+        agent_mode = row["agent_mode"] if row else "single"
+
         config = RunnableConfig(configurable={"thread_id": thread_id})
         checkpoint_tuple = checkpointer.get_tuple(config)
         if checkpoint_tuple is None:
             return []
-        messages = checkpoint_tuple.checkpoint["channel_values"]["messages"]
-        return self._clean_messages(messages)
+        channel_values = checkpoint_tuple.checkpoint.get("channel_values", {})
+        messages = channel_values.get("messages", [])
+        report_ready = bool(channel_values.get("final_report", ""))
+        return self._clean_messages(messages, agent_mode, report_ready)
 
     def delete_session(self, user_id: str, thread_id: str):
         logger.info(f"[delete_session]: user_id={user_id} thread_id={thread_id}")
@@ -141,24 +185,82 @@ class ChatService:
         )
         db_connection.commit()
 
-    def _clean_messages(self, messages):
-        """历史回放：按轮次切分，每轮包含用户消息 + AI 回复（含工具调用）。"""
+    def _clean_messages(self, messages, agent_mode="single", report_ready=False):
+        """历史回放：按 agent_mode 分支处理。"""
+        if agent_mode == "multi":
+            return self._clean_multi_messages(messages, report_ready)
+        return self._clean_single_messages(messages)
+
+    def _clean_multi_messages(self, messages, report_ready):
+        """多 Agent 历史：返回 agent_messages 列表，前端重建卡片。"""
+        cleaned: list[dict] = []
+        turn_id = 0
+        agent_messages: list[dict] = []
+
+        def _flush_turn():
+            nonlocal agent_messages
+            if agent_messages:
+                cleaned.append({
+                    "role": "turn",
+                    "turn_id": turn_id,
+                    "tools": [],
+                    "ai_content": "",
+                    "is_multi": True,
+                    "agent_messages": agent_messages,
+                    "report_ready": report_ready,
+                })
+            agent_messages = []
+
+        for msg in messages:
+            if msg.additional_kwargs.get("lc_source") == "summarization":
+                continue
+            if isinstance(msg, HumanMessage):
+                _flush_turn()
+                cleaned.append({
+                    "role": "human",
+                    "content": msg.content,
+                    "timestamp": msg.additional_kwargs.get("timestamp", ""),
+                })
+                turn_id += 1
+                continue
+            if isinstance(msg, AIMessage):
+                if not msg.content:
+                    continue
+                ak = msg.additional_kwargs or {}
+                agent_messages.append({
+                    "agent": ak.get("agent", ""),
+                    "section_id": ak.get("section_id", ""),
+                    "section_title": ak.get("section_title", ""),
+                    "content": msg.content,
+                })
+                continue
+
+        _flush_turn()
+        return cleaned
+
+    def _clean_single_messages(self, messages):
+        """单 Agent 历史：原逻辑 + 提取 thinking。"""
         cleaned: list[dict] = []
         turn_id = 0
         turn_tools: list[str] = []
         turn_ai_content = ""
+        turn_thinking = ""
 
         def _flush_turn():
-            nonlocal turn_tools, turn_ai_content
+            nonlocal turn_tools, turn_ai_content, turn_thinking
             if turn_tools or turn_ai_content:
-                cleaned.append({
+                item = {
                     "role": "turn",
                     "turn_id": turn_id,
                     "tools": turn_tools,
                     "ai_content": turn_ai_content,
-                })
+                }
+                if turn_thinking:
+                    item["thinking"] = turn_thinking
+                cleaned.append(item)
             turn_tools = []
             turn_ai_content = ""
+            turn_thinking = ""
 
         for msg in messages:
             if msg.additional_kwargs.get("lc_source") == "summarization":
@@ -177,6 +279,10 @@ class ChatService:
                     continue
                 if msg.content:
                     turn_ai_content = (turn_ai_content + msg.content) if turn_ai_content else msg.content
+                ak = msg.additional_kwargs or {}
+                thinking = ak.get("reasoning_content", "")
+                if thinking:
+                    turn_thinking = (turn_thinking + thinking) if turn_thinking else thinking
                 if msg.tool_calls:
                     for tc in msg.tool_calls:
                         tool_name = tc.get("name", "")
@@ -191,5 +297,21 @@ class ChatService:
 
         _flush_turn()
         return cleaned
+
+    def download_report(self, user_id: str, thread_id: str) -> tuple[str, str]:
+        """从 checkpoint 中提取最终报告的 Markdown 文本。"""
+        logger.info(f"[download_report]: user_id={user_id} thread_id={thread_id}")
+        owned = self._assert_own_thread(user_id, thread_id)
+        if not owned:
+            raise BusinessException(404, "会话不存在或无权访问")
+        config = RunnableConfig(configurable={"thread_id": thread_id})
+        checkpoint_tuple = checkpointer.get_tuple(config)
+        if checkpoint_tuple is None:
+            raise BusinessException(404, "未找到报告内容")
+        channel_values = checkpoint_tuple.checkpoint.get("channel_values", {})
+        final_report = channel_values.get("final_report", "")
+        if not final_report:
+            raise BusinessException(404, "该会话尚未生成完整报告")
+        return final_report, "report.md"
 
 chat_service = ChatService()

@@ -19,3 +19,23 @@ def load_system_prompts():
 
 def load_summary_prompt():
     return _load_prompt("summary_prompt_path")
+
+
+def load_metadata_extraction_prompt():
+    return _load_prompt("paper_metadata_extraction_prompt_path")
+
+
+def load_planner_prompt():
+    return _load_prompt("planner_prompt_path")
+
+
+def load_researcher_prompt():
+    return _load_prompt("researcher_prompt_path")
+
+
+def load_section_writer_prompt():
+    return _load_prompt("section_writer_prompt_path")
+
+
+def load_editor_prompt():
+    return _load_prompt("editor_prompt_path")

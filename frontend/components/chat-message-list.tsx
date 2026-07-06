@@ -13,6 +13,7 @@ import type { ChatMessage } from "@/lib/types";
 type ChatMessageListProps = {
   messages: ChatMessage[];
   isLoadingHistory: boolean;
+  onDownload?: () => void;
 };
 
 function ClientScrollButton() {
@@ -29,6 +30,7 @@ function ClientScrollButton() {
 export function ChatMessageList({
   messages,
   isLoadingHistory,
+  onDownload,
 }: ChatMessageListProps) {
   return (
     <div className="relative flex-1 overflow-hidden">
@@ -67,6 +69,7 @@ export function ChatMessageList({
               <ChatMessageItem
                 key={message.id}
                 message={message}
+                onDownload={onDownload}
               />
             ))
           )}

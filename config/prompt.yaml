@@ -1,2 +1,7 @@
 system_prompt_path: prompts/system_prompt.txt
 summary_prompt_path: prompts/summary_prompt.txt
+paper_metadata_extraction_prompt_path: prompts/paper_metadata_extraction.txt
+planner_prompt_path: prompts/planner.txt
+researcher_prompt_path: prompts/researcher.txt
+section_writer_prompt_path: prompts/section_writer.txt
+editor_prompt_path: prompts/editor.txt
