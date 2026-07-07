@@ -127,6 +127,24 @@ def _init_tables(connection):
         """
     )
 
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_agent_call_log (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     TEXT      NOT NULL,
+            thread_id   TEXT      NOT NULL,
+            agent_mode  TEXT      NOT NULL,
+            create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_user_agent_call_log_user_date
+        ON user_agent_call_log (user_id, create_time)
+        """
+    )
+
     connection.commit()
 
 db_connection = _create_connection()

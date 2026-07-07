@@ -3,6 +3,7 @@ from langchain_core.runnables import RunnableConfig
 from app.utils.checkpointer_handler import checkpointer
 from app.utils.db_handler import db_connection
 from app.agent.chat_agent import chat_agent
+from app.services.quota_service import quota_service
 from app.utils.logger_handler import logger
 from app.business.chat_request import ChatRequest
 from app.business.exceptions import BusinessException
@@ -13,6 +14,9 @@ class ChatService:
     def chat_streaming_response(self, request: ChatRequest):
         try:
             logger.info(f"[chat_streaming_response]: {str(request)}")
+            quota_service.check_and_log_agent_call(
+                request.user_id, request.thread_id, request.agent_mode
+            )
             self._ensure_thread_record(request.user_id, request.thread_id, request.message, request.agent_mode)
             seen_tool_indices: set[int] = set()
 

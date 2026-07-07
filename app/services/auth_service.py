@@ -2,6 +2,7 @@ import uuid
 
 from app.business.exceptions import BusinessException
 from app.business.user import User
+from app.services.quota_service import quota_service
 from app.utils.db_handler import db_connection
 from app.utils.logger_handler import logger
 from app.utils.security import hash_password, verify_password
@@ -16,6 +17,8 @@ class AuthService:
             raise BusinessException(400, "用户名长度需为 3-32 个字符")
         if len(password) < 6 or len(password) > 64:
             raise BusinessException(400, "密码长度需为 6-64 个字符")
+
+        quota_service.check_register_quota()
 
         if self._get_user_by_username(username) is not None:
             raise BusinessException(400, "用户名已被占用")

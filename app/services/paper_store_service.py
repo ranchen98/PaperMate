@@ -6,6 +6,7 @@ from fastapi import UploadFile
 
 from app.business.exceptions import BusinessException
 from app.business.paper_file import PaperFile
+from app.services.quota_service import quota_service
 from app.utils.config_handler import es_config, agent_config
 from app.utils.db_handler import db_connection
 from app.utils.file_handler import get_bytes_md5_hex
@@ -47,6 +48,7 @@ class PaperStoreService:
         """
         records: list[PaperFile] = []
         new_file_ids: list[str] = []
+        quota_service.check_paper_upload_quota(user_id, len(files))
         for file in files:
             record, is_new = await self._save_one(file, user_id, topic)
             records.append(record)

@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     JWT_SECRET: str
     JWT_ALG: str = "HS256"
     ACCESS_TOKEN_EXPIRE_DAYS: int = 7
+    # 每日配额（达到阈值时才向用户提示，前端无需主动显式提醒）
+    DAILY_REGISTER_LIMIT: int = 3        # 每天最多新注册用户数（全局）
+    DAILY_AGENT_CALL_LIMIT: int = 10     # 每用户每天最多调用 Agent (single/multi) 次数
+    DAILY_PAPER_UPLOAD_LIMIT: int = 10   # 每用户每天最多上传论文数
 
 env = Settings()
 
