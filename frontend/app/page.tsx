@@ -64,7 +64,12 @@ function AppContent({
     isStreaming,
     isLoadingHistory,
     error,
+    rewindCheckpointId,
+    rewindDraft,
     sendMessage,
+    resume,
+    rewindTo,
+    cancelRewind,
     stopStreaming,
   } = useChat(currentThreadId, refresh, userId);
 
@@ -217,10 +222,29 @@ function AppContent({
               </div>
             )}
 
+            {rewindCheckpointId && (
+              <div className="flex items-center justify-between border-b border-primary/20 bg-primary/5 px-4 py-2 text-sm">
+                <span className="text-primary">
+                  已进入回溯模式，发送消息将从该点重新生成对话
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => cancelRewind()}
+                >
+                  取消回溯
+                </Button>
+              </div>
+            )}
+
             <ChatMessageList
               messages={messages}
               isLoadingHistory={isLoadingHistory}
               onDownload={handleDownload}
+              onRewind={rewindTo}
+              onResume={() => resume(agentMode)}
+              canRewind={agentMode === "single" && !isStreaming && !rewindCheckpointId}
             />
 
             <ChatInput
@@ -229,6 +253,7 @@ function AppContent({
               onModeChange={setAgentMode}
               onSend={(content) => sendMessage(content, agentMode)}
               onStop={stopStreaming}
+              prefillValue={rewindDraft}
             />
           </>
         )}

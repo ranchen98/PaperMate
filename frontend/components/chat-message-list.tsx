@@ -14,6 +14,9 @@ type ChatMessageListProps = {
   messages: ChatMessage[];
   isLoadingHistory: boolean;
   onDownload?: () => void;
+  onRewind?: (messageId: string) => void;
+  onResume?: () => void;
+  canRewind?: boolean;
 };
 
 function ClientScrollButton() {
@@ -31,6 +34,9 @@ export function ChatMessageList({
   messages,
   isLoadingHistory,
   onDownload,
+  onRewind,
+  onResume,
+  canRewind,
 }: ChatMessageListProps) {
   return (
     <div className="relative flex-1 overflow-hidden">
@@ -70,6 +76,9 @@ export function ChatMessageList({
                 key={message.id}
                 message={message}
                 onDownload={onDownload}
+                onRewind={onRewind}
+                onResume={onResume}
+                canRewind={canRewind}
               />
             ))
           )}

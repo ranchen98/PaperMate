@@ -35,6 +35,8 @@ export type ChatMessage = {
   thinking?: string;
   agentCards?: AgentCard[];
   isReportReady?: boolean;
+  forkCheckpointId?: string;
+  isInterrupted?: boolean;
 };
 
 export type Thread = {
@@ -49,10 +51,22 @@ export type ChatRequest = {
   message: string;
   user_id: string;
   agent_mode: AgentMode;
+  checkpoint_id?: string;
+};
+
+export type ResumeRequest = {
+  thread_id: string;
+  user_id: string;
+  agent_mode: AgentMode;
 };
 
 export type RawHistoryItem =
-  | { role: "human"; content: string; timestamp?: string }
+  | {
+      role: "human";
+      content: string;
+      timestamp?: string;
+      fork_checkpoint_id?: string;
+    }
   | {
       role: "turn";
       turn_id: number;
@@ -69,7 +83,11 @@ export type RawHistoryItem =
       report_ready?: boolean;
     };
 
-export type HistoryResponse = RawHistoryItem[];
+export type HistoryResponse = {
+  messages: RawHistoryItem[];
+  is_interrupted: boolean;
+  agent_mode: AgentMode;
+};
 
 export type StreamEvent =
   | { role: "ai"; content: string; agent?: string; section_id?: string; section_title?: string }

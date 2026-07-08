@@ -59,9 +59,7 @@ export function AgentModeToggle({
           </div>
         </TooltipTrigger>
         <TooltipContent side="top">
-          {checked
-            ? "科研报告模式：多 Agent 协作生成科研报告"
-            : "单 Agent 模式：答疑 / 调查 / 研究"}
+          科研报告模式：多 Agent 协作生成科研报告
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

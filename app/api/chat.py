@@ -14,6 +14,13 @@ async def chat_stream(request: ChatRequest, user: User = Depends(require_user)):
     request.user_id = user.user_id
     return StreamingResponse(chat_service.chat_streaming_response(request), media_type="text/event-stream")
 
+@router.post("/chat/resume")
+async def chat_resume(request: ChatRequest, user: User = Depends(require_user)):
+    """断点续聊：从最后 checkpoint 续跑（message 置 None）"""
+    request.user_id = user.user_id
+    request.message = None
+    return StreamingResponse(chat_service.chat_streaming_response(request), media_type="text/event-stream")
+
 @router.get("/chat/delete_session")
 async def delete_session(thread_id: str, user: User = Depends(require_user)):
     """调用delete session service"""

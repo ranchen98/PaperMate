@@ -1,14 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchHistory, streamChat } from "@/lib/api";
+import { fetchHistory, resumeChat, streamChat } from "@/lib/api";
 import type {
   AgentCard,
   AgentCardSection,
   AgentMode,
   ChatMessage,
+  HistoryResponse,
   RawHistoryItem,
   Role,
+  StreamEvent,
   ToolCall,
 } from "@/lib/types";
 
@@ -17,8 +19,10 @@ function makeId() {
   return `msg-${++msgSeq}`;
 }
 
-function adaptHistory(items: RawHistoryItem[]): ChatMessage[] {
+function adaptHistory(items: RawHistoryItem[], isInterrupted: boolean): ChatMessage[] {
   const out: ChatMessage[] = [];
+  let lastAiMsgId: string | null = null;
+
   for (const item of items) {
     if (item.role === "human") {
       out.push({
@@ -26,6 +30,7 @@ function adaptHistory(items: RawHistoryItem[]): ChatMessage[] {
         role: "human" as Role,
         content: item.content ?? "",
         timestamp: item.timestamp ?? undefined,
+        forkCheckpointId: item.fork_checkpoint_id || undefined,
       });
       continue;
     }
@@ -55,13 +60,16 @@ function adaptHistory(items: RawHistoryItem[]): ChatMessage[] {
           section.content += am.content;
         }
       }
+      const aiId = makeId();
+      lastAiMsgId = aiId;
       out.push({
-        id: makeId(),
+        id: aiId,
         role: "ai" as Role,
         content: "",
         isStreaming: false,
         agentCards: cards,
         isReportReady: turn.report_ready,
+        isInterrupted: false,
       });
     } else {
       const toolCalls: ToolCall[] | undefined =
@@ -73,15 +81,25 @@ function adaptHistory(items: RawHistoryItem[]): ChatMessage[] {
             }))
           : undefined;
       if (toolCalls || turn.ai_content) {
+        const aiId = makeId();
+        lastAiMsgId = aiId;
         out.push({
-          id: makeId(),
+          id: aiId,
           role: "ai" as Role,
           content: turn.ai_content ?? "",
           thinking: turn.thinking,
           isStreaming: false,
           toolCalls,
+          isInterrupted: false,
         });
       }
+    }
+  }
+
+  if (isInterrupted && lastAiMsgId) {
+    const idx = out.findIndex((m) => m.id === lastAiMsgId);
+    if (idx !== -1) {
+      out[idx] = { ...out[idx], isInterrupted: true };
     }
   }
   return out;
@@ -149,29 +167,37 @@ export function useChat(
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isInterrupted, setIsInterrupted] = useState(false);
+  const [rewindCheckpointId, setRewindCheckpointId] = useState<string | null>(null);
+  const [rewindDraft, setRewindDraft] = useState<{ text: string; nonce: number } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!threadId) {
       setMessages([]);
       setError(null);
+      setIsInterrupted(false);
+      setRewindCheckpointId(null);
       return;
     }
 
     let cancelled = false;
     setIsLoadingHistory(true);
     setError(null);
+    setRewindCheckpointId(null);
 
     fetchHistory(threadId)
-      .then((data) => {
+      .then((data: HistoryResponse) => {
         if (cancelled) return;
-        setMessages(adaptHistory(data));
+        setMessages(adaptHistory(data.messages, data.is_interrupted));
+        setIsInterrupted(data.is_interrupted);
       })
       .catch((err) => {
         if (cancelled) return;
         console.error("[useChat] load history error:", err);
         setError("加载历史消息失败");
         setMessages([]);
+        setIsInterrupted(false);
       })
       .finally(() => {
         if (!cancelled) setIsLoadingHistory(false);
@@ -182,21 +208,11 @@ export function useChat(
     };
   }, [threadId]);
 
-  const sendMessage = useCallback(
-    async (content: string, mode: AgentMode = "single") => {
-      if (!threadId || !content.trim() || isStreaming) return;
-
-      const userMsg: ChatMessage = {
-        id: makeId(),
-        role: "human",
-        content: content.trim(),
-        timestamp: new Date().toISOString(),
-      };
-
-      setMessages((prev) => [...prev, userMsg]);
-      setIsStreaming(true);
-      setError(null);
-
+  const processStreamEvents = useCallback(
+    async (
+      stream: AsyncGenerator<StreamEvent, void, unknown>,
+      mode: AgentMode,
+    ) => {
       let aiMsgId: string | null = null;
 
       const ensureAiMsg = (): string => {
@@ -216,15 +232,8 @@ export function useChat(
         return newId;
       };
 
-      const request = {
-        thread_id: threadId,
-        message: content.trim(),
-        user_id: userId,
-        agent_mode: mode,
-      };
-
       try {
-        for await (const ev of streamChat(request)) {
+        for await (const ev of stream) {
           if (ev.role === "tool") {
             const id = ensureAiMsg();
             const call: ToolCall = {
@@ -307,18 +316,6 @@ export function useChat(
             }
           }
         }
-      } catch (err) {
-        console.error("[useChat] send error:", err);
-        const errMsg = (err instanceof Error && err.message) || "调用失败，请重试";
-        setError(errMsg);
-        const id = ensureAiMsg();
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === id
-              ? { ...m, content: m.content || errMsg }
-              : m,
-          ),
-        );
       } finally {
         if (aiMsgId !== null) {
           setMessages((prev) =>
@@ -339,12 +336,117 @@ export function useChat(
             }),
           );
         }
+      }
+    },
+    [],
+  );
+
+  const sendMessage = useCallback(
+    async (content: string, mode: AgentMode = "single") => {
+      if (!threadId || !content.trim() || isStreaming) return;
+
+      const userMsg: ChatMessage = {
+        id: makeId(),
+        role: "human",
+        content: content.trim(),
+        timestamp: new Date().toISOString(),
+      };
+
+      setMessages((prev) => [...prev, userMsg]);
+      setIsStreaming(true);
+      setError(null);
+      setIsInterrupted(false);
+
+      const request = {
+        thread_id: threadId,
+        message: content.trim(),
+        user_id: userId,
+        agent_mode: mode,
+        ...(rewindCheckpointId ? { checkpoint_id: rewindCheckpointId } : {}),
+      };
+
+      try {
+        await processStreamEvents(streamChat(request), mode);
+        setRewindCheckpointId(null);
+        setRewindDraft(null);
+      } catch (err) {
+        console.error("[useChat] send error:", err);
+        const errMsg = (err instanceof Error && err.message) || "调用失败，请重试";
+        setError(errMsg);
+        setMessages((prev) => {
+          const lastAi = [...prev].reverse().find((m) => m.role === "ai");
+          if (!lastAi) return prev;
+          return prev.map((m) =>
+            m.id === lastAi.id
+              ? { ...m, content: m.content || errMsg, isStreaming: false }
+              : m,
+          );
+        });
+      } finally {
         setIsStreaming(false);
         onStreamComplete?.();
       }
     },
-    [threadId, isStreaming, onStreamComplete, userId],
+    [threadId, isStreaming, onStreamComplete, userId, rewindCheckpointId, processStreamEvents],
   );
+
+  const resume = useCallback(
+    async (mode: AgentMode = "single") => {
+      if (!threadId || isStreaming) return;
+
+      setIsStreaming(true);
+      setError(null);
+      setIsInterrupted(false);
+
+      try {
+        await processStreamEvents(
+          resumeChat({
+            thread_id: threadId,
+            user_id: userId,
+            agent_mode: mode,
+          }),
+          mode,
+        );
+      } catch (err) {
+        console.error("[useChat] resume error:", err);
+        const errMsg = (err instanceof Error && err.message) || "续聊失败，请重试";
+        setError(errMsg);
+      } finally {
+        setIsStreaming(false);
+        onStreamComplete?.();
+      }
+    },
+    [threadId, isStreaming, userId, onStreamComplete, processStreamEvents],
+  );
+
+  const rewindTo = useCallback(
+    (messageId: string) => {
+      if (isStreaming) return;
+      const target = messages.find((m) => m.id === messageId);
+      if (!target || target.role !== "human" || !target.forkCheckpointId) return;
+
+      const idx = messages.findIndex((m) => m.id === messageId);
+      setMessages(messages.slice(0, idx));
+      setRewindCheckpointId(target.forkCheckpointId);
+      setRewindDraft({ text: target.content, nonce: Date.now() });
+      setIsInterrupted(false);
+    },
+    [messages, isStreaming],
+  );
+
+  const cancelRewind = useCallback(() => {
+    setRewindCheckpointId(null);
+    setRewindDraft(null);
+    if (!threadId) return;
+    fetchHistory(threadId)
+      .then((data: HistoryResponse) => {
+        setMessages(adaptHistory(data.messages, data.is_interrupted));
+        setIsInterrupted(data.is_interrupted);
+      })
+      .catch((err) => {
+        console.error("[useChat] cancelRewind reload error:", err);
+      });
+  }, [threadId]);
 
   const stopStreaming = useCallback(() => {
     abortRef.current?.abort();
@@ -353,6 +455,8 @@ export function useChat(
   const clearMessages = useCallback(() => {
     setMessages([]);
     setError(null);
+    setRewindCheckpointId(null);
+    setIsInterrupted(false);
   }, []);
 
   return {
@@ -360,7 +464,13 @@ export function useChat(
     isStreaming,
     isLoadingHistory,
     error,
+    isInterrupted,
+    rewindCheckpointId,
+    rewindDraft,
     sendMessage,
+    resume,
+    rewindTo,
+    cancelRewind,
     stopStreaming,
     clearMessages,
   };

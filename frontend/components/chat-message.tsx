@@ -2,9 +2,9 @@
 
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Markdown } from "@/components/prompt-kit/markdown";
+import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/prompt-kit/loader";
-import { Bot, User } from "lucide-react";
+import { Bot, User, CornerUpLeft, Play } from "lucide-react";
 import type { ChatMessage } from "@/lib/types";
 import { AgentResponse } from "@/components/agents-ui/agent-response";
 import { AgentCards } from "@/components/agents-ui/agent-cards";
@@ -23,9 +23,18 @@ function formatTime(ts: string): string {
 type ChatMessageItemProps = {
   message: ChatMessage;
   onDownload?: () => void;
+  onRewind?: (messageId: string) => void;
+  onResume?: () => void;
+  canRewind?: boolean;
 };
 
-export function ChatMessageItem({ message, onDownload }: ChatMessageItemProps) {
+export function ChatMessageItem({
+  message,
+  onDownload,
+  onRewind,
+  onResume,
+  canRewind,
+}: ChatMessageItemProps) {
   const isHuman = message.role === "human";
   const hasToolCalls = (message.toolCalls?.length ?? 0) > 0;
   const isMultiAgent = (message.agentCards?.length ?? 0) > 0;
@@ -34,7 +43,7 @@ export function ChatMessageItem({ message, onDownload }: ChatMessageItemProps) {
   return (
     <div
       className={cn(
-        "flex gap-3 px-1",
+        "group flex gap-3 px-1",
         isHuman && "flex-row-reverse",
       )}
     >
@@ -61,9 +70,23 @@ export function ChatMessageItem({ message, onDownload }: ChatMessageItemProps) {
             <Loader variant="typing" size="sm" />
           </div>
         ) : isHuman ? (
-          <div className="whitespace-pre-wrap break-words rounded-lg bg-primary p-2.5 text-primary-foreground">
-            {message.content}
-          </div>
+          <>
+            <div className="whitespace-pre-wrap break-words rounded-lg bg-primary p-2.5 text-primary-foreground">
+              {message.content}
+            </div>
+            {canRewind && onRewind && message.forkCheckpointId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 gap-1 px-2 text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                onClick={() => onRewind(message.id)}
+                title="回溯到此点重新提问"
+              >
+                <CornerUpLeft className="size-3" />
+                回溯
+              </Button>
+            )}
+          </>
         ) : isMultiAgent ? (
           <div className="rounded-lg bg-secondary p-2.5 w-full max-w-full">
             <AgentCards
@@ -82,6 +105,17 @@ export function ChatMessageItem({ message, onDownload }: ChatMessageItemProps) {
               isStreaming={message.isStreaming}
             />
           </div>
+        )}
+        {message.isInterrupted && onResume && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 text-xs"
+            onClick={onResume}
+          >
+            <Play className="size-3" />
+            继续生成
+          </Button>
         )}
         {message.timestamp && isHuman && (
           <span className="px-1 text-xs text-muted-foreground">

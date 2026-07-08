@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowUp, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +18,7 @@ type ChatInputProps = {
   onModeChange: (mode: AgentMode) => void;
   onSend: (content: string) => void;
   onStop: () => void;
+  prefillValue?: { text: string; nonce: number } | null;
 };
 
 export function ChatInput({
@@ -26,8 +27,15 @@ export function ChatInput({
   onModeChange,
   onSend,
   onStop,
+  prefillValue,
 }: ChatInputProps) {
   const [value, setValue] = useState("");
+
+  useEffect(() => {
+    if (prefillValue) {
+      setValue(prefillValue.text);
+    }
+  }, [prefillValue?.nonce]);
 
   const handleSubmit = () => {
     if (!value.trim() || isStreaming) return;

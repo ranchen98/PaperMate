@@ -11,6 +11,8 @@ DB_PATH = os.path.join(DB_DIR, "papermate.db")
 def _create_connection():
     connection = sqlite3.connect(DB_PATH, check_same_thread=False)
     connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA journal_mode=WAL")
+    connection.execute("PRAGMA busy_timeout=5000")
     return connection
 
 

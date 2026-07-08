@@ -3,6 +3,7 @@ import type {
   ChatRequest,
   HistoryResponse,
   PaperFile,
+  ResumeRequest,
   StreamEvent,
   ThreadListResponse,
 } from "@/lib/types";
@@ -173,7 +174,31 @@ export async function* streamChat(
     throw new ApiError(res.status, `HTTP ${res.status}: ${res.statusText}`);
   }
 
-  const reader = res.body.getReader();
+  yield* parseSseStream(res);
+}
+
+export async function* resumeChat(
+  request: ResumeRequest,
+): AsyncGenerator<StreamEvent, void, unknown> {
+  const res = await fetch("/chat/resume", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify(request),
+  });
+
+  if (!res.ok || !res.body) {
+    if (res.status === 401) notifyUnauthorized();
+    throw new ApiError(res.status, `HTTP ${res.status}: ${res.statusText}`);
+  }
+
+  yield* parseSseStream(res);
+}
+
+async function* parseSseStream(
+  res: Response,
+): AsyncGenerator<StreamEvent, void, unknown> {
+  const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
 
