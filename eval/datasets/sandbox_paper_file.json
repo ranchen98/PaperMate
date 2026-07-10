@@ -1,0 +1,72 @@
+[
+  {
+    "file_id": "sandbox_adapointr",
+    "user_id": "sandbox_user",
+    "file_name": "AdaPoinTr.pdf",
+    "file_path": "resources/data/5252249ab5804cf79c8d07cff2c5c584.pdf",
+    "md5": "ea59dafcd1208ccea24a63518ecb0aec",
+    "topic": "",
+    "zip_file_name": "5252249ab5804cf79c8d07cff2c5c584.zip",
+    "is_md_parsed": 1,
+    "is_indexed": 1,
+    "upload_time": "2026-07-06 08:37:27",
+    "update_time": "2026-07-06 08:37:53",
+    "md_file_name": ""
+  },
+  {
+    "file_id": "sandbox_pcn",
+    "user_id": "sandbox_user",
+    "file_name": "PCN Point Completion Network.pdf",
+    "file_path": "resources/data/6198e8669639418fbde27fdc400a116e.pdf",
+    "md5": "6535ccc2270f0dc7b55cf4b12d5c5724",
+    "topic": "",
+    "zip_file_name": "6198e8669639418fbde27fdc400a116e.zip",
+    "is_md_parsed": 1,
+    "is_indexed": 1,
+    "upload_time": "2026-07-06 09:38:44",
+    "update_time": "2026-07-06 09:38:58",
+    "md_file_name": ""
+  },
+  {
+    "file_id": "sandbox_restoration",
+    "user_id": "sandbox_user",
+    "file_name": "基于深度学习的三维点云修复技术综述_刘彩霞.pdf",
+    "file_path": "resources/data/73a4ee9add734ddeaf7578e5c7aa94f4.pdf",
+    "md5": "d2681a15188a5ef4add5e66f8294b163",
+    "topic": "",
+    "zip_file_name": "73a4ee9add734ddeaf7578e5c7aa94f4.zip",
+    "is_md_parsed": 1,
+    "is_indexed": 1,
+    "upload_time": "2026-07-07 09:24:09",
+    "update_time": "2026-07-07 09:24:24",
+    "md_file_name": ""
+  },
+  {
+    "file_id": "sandbox_registration",
+    "user_id": "sandbox_user",
+    "file_name": "基于深度学习的点云配准方法综述_齐含.pdf",
+    "file_path": "resources/data/8728c7f791fb48a99e1e8a545f2727cd.pdf",
+    "md5": "8b93a39c79d664e468df3d0d7f49d756",
+    "topic": "",
+    "zip_file_name": "8728c7f791fb48a99e1e8a545f2727cd.zip",
+    "is_md_parsed": 1,
+    "is_indexed": 1,
+    "upload_time": "2026-07-07 09:23:05",
+    "update_time": "2026-07-07 09:23:38",
+    "md_file_name": ""
+  },
+  {
+    "file_id": "sandbox_pct",
+    "user_id": "sandbox_user",
+    "file_name": "PCT-Point Cloud Transformer.pdf",
+    "file_path": "resources/data/879318b6e0ad437998b4d05805bc23fe.pdf",
+    "md5": "60f512665af7a09cde5bc68de82e0cbb",
+    "topic": "",
+    "zip_file_name": "879318b6e0ad437998b4d05805bc23fe.zip",
+    "is_md_parsed": 1,
+    "is_indexed": 1,
+    "upload_time": "2026-07-07 09:23:05",
+    "update_time": "2026-07-07 09:23:33",
+    "md_file_name": ""
+  }
+]

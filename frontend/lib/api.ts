@@ -159,14 +159,24 @@ export async function deletePaper(fileId: string): Promise<void> {
   }
 }
 
+export async function stopChat(threadId: string): Promise<void> {
+  await getJson<null>(`/chat/stop`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ thread_id: threadId }),
+  });
+}
+
 export async function* streamChat(
   request: ChatRequest,
+  signal?: AbortSignal,
 ): AsyncGenerator<StreamEvent, void, unknown> {
   const res = await fetch("/chat/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
     body: JSON.stringify(request),
+    signal,
   });
 
   if (!res.ok || !res.body) {
@@ -179,12 +189,14 @@ export async function* streamChat(
 
 export async function* resumeChat(
   request: ResumeRequest,
+  signal?: AbortSignal,
 ): AsyncGenerator<StreamEvent, void, unknown> {
   const res = await fetch("/chat/resume", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
     body: JSON.stringify(request),
+    signal,
   });
 
   if (!res.ok || !res.body) {

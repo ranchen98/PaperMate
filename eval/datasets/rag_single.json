@@ -1,0 +1,23 @@
+[
+  {
+    "user_input": "这篇论文的注意力机制是怎么定义的？",
+    "reference": "论文中将注意力机制定义为将查询（query）与一组键值对（key-value pairs）映射到输出的函数，输出为各 value 的加权求和，权重由 query 与对应 key 的相似度（打分函数）经 softmax 归一化得到。",
+    "reference_contexts": [
+      "注意力函数可以描述为将一个查询（query）和一组键值对（key-value pairs）映射为一个输出，其中 query、keys、values 和输出都是向量。输出是 values 的加权和，每个 value 的权重由 query 与对应 key 的兼容函数计算得到。"
+    ]
+  },
+  {
+    "user_input": "论文里提到的损失函数是什么？",
+    "reference": "论文使用交叉熵损失（cross-entropy loss）作为分类目标的训练损失，并结合 L2 正则化项以防止过拟合。",
+    "reference_contexts": [
+      "我们在分类任务中采用交叉熵损失函数，并在权重上施加 L2 正则化项以约束模型复杂度。"
+    ]
+  },
+  {
+    "user_input": "这篇论文的实验用了哪个数据集？",
+    "reference": "论文实验在 ImageNet 的子集 ILSVRC-2012 上进行，包含约 120 万张训练图像和 5 万张验证图像，覆盖 1000 个类别。",
+    "reference_contexts": [
+      "实验在 ImageNet 大规模视觉识别挑战 ILSVRC-2012 数据集上进行，该数据集包含 1000 个类别、约 120 万张训练图像和 50000 张验证图像。"
+    ]
+  }
+]

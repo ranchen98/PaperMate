@@ -92,7 +92,8 @@ export type HistoryResponse = {
 export type StreamEvent =
   | { role: "ai"; content: string; agent?: string; section_id?: string; section_title?: string }
   | { role: "thinking"; content: string; agent?: string; section_id?: string; section_title?: string }
-  | { role: "tool"; tool_name: string };
+  | { role: "tool"; tool_name: string }
+  | { role: "stopped" };
 
 export type ThreadListResponse = Thread[];
 

@@ -1,0 +1,194 @@
+[
+  {
+    "category": "content",
+    "user_input": "AdaPoinTr 把点云补全任务转化成了什么问题？",
+    "reference": "AdaPoinTr 将点云补全（point cloud completion）转化为一个集合到集合的翻译问题（set-to-set translation problem），采用 Transformer 编码器-解码器架构，把部分点云的 point proxies 作为输入，生成缺失部分的 point proxies，类似于语言翻译流程。",
+    "reference_contexts": [
+      "By analogy to the language translation pipeline, we model point cloud completion as a set-to-set translation task, where the Transformers take the point proxies of the partial point clouds as the inputs and produce the point proxies of the missing parts.",
+      "We propose to formulate the point cloud completion task as a set-to-set translation task and use a Transformer encoder-decoder architecture to learn the complex dependencies among the point groups."
+    ]
+  },
+  {
+    "category": "content",
+    "user_input": "AdaPoinTr 中的 Point Proxy 是什么？",
+    "reference": "Point Proxy 是代表点云中一个局部区域（local region）的特征向量。输入点云被转换为一组 Point Proxy 序列，作为 Transformer 模型的输入；它由 DGCNN 提取的点特征加上位置嵌入（position embedding）构成，前者编码局部语义模式，后者编码全局位置。",
+    "reference_contexts": [
+      "A point proxy represents a local region of the point clouds. Inspired by the set abstraction operation in [42], we first conduct furthest point sample (FPS) to locate a fixed number N of point centers in the partial point cloud. Then, we use a lightweight DGCNN [63] with hierarchical downsampling to extract the feature of the point centers from the input point cloud.",
+      "Point Proxy: We represent the set of point clouds in a local region as a feature vector called Point Proxy. The input point cloud is converted to a sequence of Point Proxies, which are used as the inputs of our Transformer model"
+    ]
+  },
+  {
+    "category": "content",
+    "user_input": "AdaPoinTr 的 geometry-aware block 是如何捕捉几何关系的？",
+    "reference": "geometry-aware block 用 kNN（k 近邻）来捕捉点云的几何关系，而不同于自注意力机制用特征相似度捕捉语义关系。它在查询坐标的 k 邻域内聚合特征，经线性层和 max-pooling 学习局部几何结构，再与多头自注意力捕获的特征拼接并映射回原维度。",
+    "reference_contexts": [
+      "Different from the self-attention module that uses the feature similarity to capture the semantic relation, we propose to use kNN to capture the geometric relations in the point cloud:",
+      "where $\\mathcal { M }$ is max-pooling operation, $V$ is the input features. Given the query coordinates $p _ { Q . }$ , we gather the features whose coordinates $p _ { k }$ locates within the k-neighborhood of $p _ { Q } ,$ represented as $\\kappa ( p _ { Q } )$ . Then we follow the practice of DGCNN [63] to learn the local geometric structures via feature aggregation with a linear layer followed by the max-pooling operation as shown in Equ. 3. The feature captured by kNN and the feature captured by multi-head self-attention are then concatenated and mapped to the original dimensions to form the output."
+    ]
+  },
+  {
+    "category": "content",
+    "user_input": "AdaPoinTr 在 PCN 数据集上的 CD 指标是多少？",
+    "reference": "AdaPoinTr 在 PCN 数据集上取得 6.53 的 CD（Chamfer Distance）指标，相比 PoinTr 的 8.38 有明显提升，建立了新的 state-of-the-art。",
+    "reference_contexts": [
+      "which attains 6.53 CD on PCN, 0.81 CD on ShapeNet-55 and 0.392 MMD on real-world KITTI, surpassing other work by a large margin and establishing new state-of-the-arts on various benchmarks.",
+      "AdaPoinTr  12.43 G  61 pc/s  0.81  1.23  9.58  11.37  6.53"
+    ]
+  },
+  {
+    "category": "content",
+    "user_input": "相比原始 PoinTr，AdaPoinTr 在训练效率和性能上有哪些提升？",
+    "reference": "AdaPoinTr 通过自适应查询生成机制和辅助去噪任务，将训练时间缩短 15 倍以上（by 15x or more），补全性能提升超过 20%（over 20%），并且只需 8% 的训练轮次即可达到比 PoinTr 更好的性能。",
+    "reference_contexts": [
+      "Coupling these two techniques enables us to train the model efficiently and effectively: we reduce training time (by 15x or more) and improve completion performance (over 20%).",
+      "As shown in Fig. 2, AdaPoinTr can achieve better performance with only 8% training epochs compared with PoinTr."
+    ]
+  },
+  {
+    "category": "content",
+    "user_input": "PCN 的编码器基于什么网络，输出特征向量维度是多少？",
+    "reference": "PCN 的编码器是 PointNet 的扩展版本（extended version of PointNet），由两个堆叠的 PN 层组成，输出一个 k=1024 维的全局特征向量 v，继承了 PointNet 对排列的不变性和对噪声的容忍度。",
+    "reference_contexts": [
+      "The encoder is in charge of summarizing the geometric information in the input point cloud as a feature vector $\\mathbf { v } \\in \\mathbb { R } ^ { k }$ where $k = 1 0 2 4$ . Our proposed encoder is an extended version of PointNet [37]. It inherits the invariance to permutation and tolerance to noise from PointNet and can handle inputs with various number of points.",
+      "The encoder consists of two stacked Point-Net (PN) layers."
+    ]
+  },
+  {
+    "category": "content",
+    "user_input": "PCN 的解码器是如何生成完整点云的？",
+    "reference": "PCN 解码器采用多阶段点生成（multistage point generation），分两阶段：第一阶段用全连接网络从特征向量生成稀疏的粗糙输出 Y_coarse（代表全局几何）；第二阶段对 Y_coarse 中每个点用折叠操作（folding）生成局部平滑曲面的密集点，组合成详细输出 Y_detail，实现由粗到细（coarse-to-fine）的生成。",
+    "reference_contexts": [
+      "Our proposed decoder combines the advantages of the fully-connected decoder [1] and the folding-based decoder [60] in a multistage point generation pipeline.",
+      "Thus, we divide the generation of the output point cloud into two stages. In the first stage, a coarse output $Y _ { c o a r s e }$ of s points is generated by passing v through a fully-connected network with 3s output units and reshaping the output into $\\textbf { a } s \\times 3$ matrix. In the second stage, for each point $\\mathbf { q } _ { i }$ in $Y _ { c o a r s e : }$ a patch of $t \\ = \\ u ^ { 2 }$ points is generated in the local coordinates centered at q<sub>i</sub> via the folding operation",
+      "a novel network architecture that generates a dense, complete point cloud in a coarse-to-fine fashion"
+    ]
+  },
+  {
+    "category": "content",
+    "user_input": "PCN 用了哪两种损失函数？",
+    "reference": "PCN 使用了两种排列不变的损失函数：Chamfer Distance（CD，倒角距离）和 Earth Mover's Distance（EMD，推土机距离）。CD 计算两个点云间平均最近点距离；EMD 寻找最小化对应点平均距离的双射。训练中粗输出用 CD 和 EMD，细输出只用 CD（因 EMD 的 O(n²) 复杂度在大点云上代价过高）。",
+    "reference_contexts": [
+      "Two candidates of permutation invariant functions are introduced by [11] – Chamfer Distance (CD) and Earth Mover's Distance (EMD).",
+      "In our experiments, we use both CD and EMD for $d _ { 1 }$ but only CD for $d _ { 2 }$ . This is because the $O ( n ^ { 2 } )$ complexity of the EMD approximation scheme makes it too expensive to compute during training when n is large, while CD can be computed with $O ( n$ log n) complexity using efficient data structure for nearest neighbour search such as KDTree."
+    ]
+  },
+  {
+    "category": "content",
+    "user_input": "PCN 的训练数据集是什么，包含多少模型和哪些类别？",
+    "reference": "PCN 训练使用 ShapeNet 的合成 CAD 模型创建数据集，取 30974 个模型，涵盖 8 个类别：飞机（airplane）、橱柜（cabinet）、汽车（car）、椅子（chair）、灯（lamp）、沙发（sofa）、桌子（table）、船（vessel）。完整点云在网格表面均匀采样 16384 个点，部分点云由 2.5D 深度图反投影到 3D 生成，每个模型从 8 个随机视角生成 8 个部分点云。",
+    "reference_contexts": [
+      "To train our model, we use synthetic CAD models from ShapeNet to create a large-scale dataset containing pairs of partial and complete point clouds (X, Y ). Specifically, we take 30974 models from 8 categories: airplane, cabinet, car, chair, lamp, sofa, table, vessel. The complete point clouds are created by sampling 16384 points uniformly on the mesh surfaces and the partial point clouds are generated by back-projecting 2.5D depth images into 3D.",
+      "For each model, 8 partial point clouds are generated from 8 randomly distributed viewpoints."
+    ]
+  },
+  {
+    "category": "content",
+    "user_input": "PCN 在真实世界实验中用了哪个数据集？",
+    "reference": "PCN 在真实世界实验中使用 KITTI 数据集的激光雷达扫描点云。具体取 KITTI 的一组 Velodyne 扫描序列，对每帧提取标注为汽车的物体边界框内点云，共得到 2483 个部分点云，用专门在 ShapeNet 汽车类别上训练的 PCN 模型完成补全。",
+    "reference_contexts": [
+      "In this experiment, we test our completion method on partial point clouds from real-world LiDAR scans. Specifically, we take a sequence of Velodyne scans from the KITTI dataset [13]. For each frame, we extract points within the object bounding boxes labeled as cars, which results in 2483 partial point clouds. Each point cloud is then transformed to the box's coordinates, completed with a PCN trained on cars from ShapeNet, and transformed back to the world frame.",
+      "Our experiments show that PCN produces dense, complete point clouds with realistic structures in the missing regions on inputs with various levels of incompleteness and noise, including cars from LiDAR scans in the KITTI dataset."
+    ]
+  },
+  {
+    "category": "content",
+    "user_input": "PCT 提出的 offset-attention 是什么？",
+    "reference": "offset-attention 是 PCT 对原始自注意力的改进：用自注意力特征与输入特征之间的偏移量（差值，offset）来替换自注意力特征，再送入 LBR 网络。这样做有两个优势：一是相对坐标比绝对坐标对刚体变换更鲁棒；二是该过程近似于图卷积中的拉普拉斯（Laplace）过程，对噪声更鲁棒、更适合点云学习。",
+    "reference_contexts": [
+      "The offsetattention module approach we proposed is an effective upgrade over the original self-attention. It works by replacing the attention feature with the offset between the input of self-attention module and attention feature. This has two advantages. Firstly, the absolute coordinates of the same object can be completely different with rigid transformations.Therefore, relative coordinates are generally more robust. Secondly, the Laplacian matrix (the offset between degree matrix and adjacency matrix) has been proven to be very effective in graph convolution learning",
+      "the offset-attention layer calculates the offset (difference) between the self-attention (SA) features and the input features by element-wise subtraction. This offset feeds the LBR network in place of the SA feature used in the na¨ıve version."
+    ]
+  },
+  {
+    "category": "content",
+    "user_input": "PCT 为什么不需要位置编码（positional encoding）？",
+    "reference": "因为点云没有固定顺序，且每个点的三维坐标本身就携带了位置信息。PCT 将原始的位置编码与输入嵌入合并为基于坐标的输入嵌入模块（coordinate-based input embedding），由于每个点有代表其空间位置的唯一坐标，可直接生成可区分的特征，因此无需 NLP Transformer 中的位置编码。",
+    "reference_contexts": [
+      "In Transformer, a positional encoding module is applied to represent the word order in nature language. This can distinguish the same word in different positions and reflect the positional relationships between words. However, point clouds do not have a fixed order. In our PCT framework, we merge the raw positional encoding and the input embedding into a coordinate-based input embedding module. It can generate distinguishable features, since each point has unique coordinates which represent its spatial position.",
+      "Overall, the encoder of PCT shares almost the same philosophy of design as the original Transformer, except that the positional embedding is discarded, since the point's coordinates already contains this information."
+    ]
+  },
+  {
+    "category": "content",
+    "user_input": "PCT 在哪些任务上取得了 state-of-the-art 性能？",
+    "reference": "PCT 在形状分类（shape classification）、部件分割（part segmentation）、语义分割（semantic segmentation）和法向量估计（normal estimation）任务上取得了 state-of-the-art 性能。",
+    "reference_contexts": [
+      "Extensive experiments demonstrate that the PCT achieves the state-of-the-art performance on shape classification, part segmentation, semantic segmentation and normal estimation tasks.",
+      "Experiments show that PCT has good semantic feature learning capability, and achieves state-of-the-art performance on several tasks, particularly shape classification, part segmentation and normal estimation."
+    ]
+  },
+  {
+    "category": "content",
+    "user_input": "基于深度学习的三维点云修复技术综述把点云修复分为哪三类？",
+    "reference": "该综述根据修复任务的侧重点，将基于深度学习的三维点云修复技术划分为三类：密集重建（dense reconstruction，又称上采样重建或超分辨率重建）、补全重建（complete reconstruction）和去噪重建（denoising reconstruction）。",
+    "reference_contexts": [
+      "根据点云修复侧重点不同, 将基于深度学习的三维点云修复技术划分为密集重建、补全重建和去噪重建 3 类",
+      "(1) 侧重于提升局部点云块内部点的分辨率(密度)和分布均匀性的修复操作, 称之为密集重建(上采样重建或超分辨率重建); (2) 聚焦于三维形状补全的点云修复操作, 称 之为补全重建; (3) 偏重于保留底层对象表面的几何细节的同时从噪声输入中恢复一个干净点集的操作, 称之为去噪重建."
+    ]
+  },
+  {
+    "category": "content",
+    "user_input": "基于深度学习的三维点云修复技术综述介绍了哪几种基础网络模型？",
+    "reference": "该综述介绍了点云修复中常用的四种基础网络模型：多层感知器（MLP，multilayer perceptron）、卷积神经网络（CNN，convolutional neural networks）、自编码器（AE，autoencoder）和对抗生成网络（GAN，generative adversarial networks）。",
+    "reference_contexts": [
+      "基于深度学习的点云修复中常用的基础网络模型包括多层感知器(multilayer perceptron, MLP)、卷 积 神 经 网 络 (convolutional neural networks,CNN)、自编码器(autoencoder, AE)和对抗生成网络(generative adversarial networks, GAN)等."
+    ]
+  },
+  {
+    "category": "content",
+    "user_input": "PU-Net 网络架构包含哪四个部分？",
+    "reference": "PU-Net 网络架构主要包括四个部分：点云块提取、点特征嵌入、特征扩展和坐标重建。首先从已知三维模型通过下采样提取不同尺度和分布的点云块，然后通过层次特征学习和多级特征聚合将原始三维坐标映射到特征空间，再将扩充后的特征聚合，最后通过一组全连接层重建为上采样点云坐标。",
+    "reference_contexts": [
+      "Yu 等[20]首先将深度神经网络引入点云密集重建任务中, 提出如图 6所示 PU-Net 网络架构, 其主要包括点云块提取、点特征嵌入、特征扩展和坐标重建 4 个部分. 首先,从一组已知的三维模型中通过下采样提取不同尺度和分布的点云块; 然后, 通过层次特征学习和多级特征聚合将原始三维坐标映射到特征空间; 最后, 将扩充后的特征进行聚合, 并通过一组全连接层重建为上采样点云坐标."
+    ]
+  },
+  {
+    "category": "content",
+    "user_input": "基于深度学习的点云配准方法综述把深度学习配准方法分为哪两类？",
+    "reference": "该综述将基于深度学习的点云配准方法分为两类：一是基于深度学习的特征提取，即先用深度网络学习点云几何特征，再用简单优化方法（如 RANSAC）获得变换矩阵完成配准；二是基于深度学习的端到端配准，即点云输入网络后直接输出变换矩阵，无需二次优化。",
+    "reference_contexts": [
+      "基于深度学习的方法根据任务的不同又可以分为基于深度学习的特征提取和基于深度学习的端到端配准，其中基于深度学习的特征提取是对点云数据进行特征学习后，再对提取后的特征利用简单的优化配准方法获得变换矩阵，从而进行点云配准。基于深度学习的端到端配准是在点云输入网络后直接输出变换矩阵，无需再使用优化方法即可进行点云配准。",
+      "本文对基于深度学习的点云配准方法进行了调查和研究，主要将其分为两类，第一类是使用深度学习对点云做特征提取，然后结合优化方法进行点云配准，第二类是基于深度学习的端到端配准，该方法直接得到点云配准的变换矩阵。"
+    ]
+  },
+  {
+    "category": "content",
+    "user_input": "REGTR 的核心架构是什么？",
+    "reference": "REGTR 是一个端到端的点云匹配框架，核心使用包含自注意力（self-attention）和交叉注意力（cross-attention）的 Transformer 层组成的网络架构，用于预测每个点位于重叠区域的概率及其在其他点云中的对应位置。它使用 KPConv 卷积骨干提取稀疏点集特征，送入编码器，解码器预测重叠分数和稀疏关键点的对应坐标，可直接预测变换矩阵，实现端到端配准。",
+    "reference_contexts": [
+      "Yew等[14]推测注意力机制可以取代显式的特征匹配和RANSAC的作用，提出了一个端到端的点云匹配框架，即REGTR，如图2所示。REGTR主要使用了包含自注意和交叉注意的Transformer层组成的网络架构，用于预测每个点位于重叠区域的概率及其在其他点云中的对应位置。REGTR使用KPConv[13]卷积骨干提取稀疏点集的一组特征，将特征传递到编码器中，然后输出解码器预测重叠分数和稀疏关键点的对应坐标,可以直接预测对应关系所需的变换矩阵,实现端到端的点云配准。"
+    ]
+  },
+  {
+    "category": "content",
+    "user_input": "ICP 配准方法的主要缺点是什么？",
+    "reference": "ICP 是常用的配准方法，通过优化两个点云之间距离度量的最小值来获得旋转矩阵和平移矩阵进行刚性配准。其主要缺点是：需要在配准前使用其他方法先进行一次粗配准，否则当两个点云之间姿态差距较大时会影响配准精度。",
+    "reference_contexts": [
+      "其中， $\\mathrm{ICP}^{[15]}$ 是常用的配准方法，需要在配准之前进行粗配准，包括对应估计和变换两个步骤，通过优化两个点云之间距离度量的最小值来获得旋转矩阵和平移矩阵，从而进行点云之间的刚性配准。基于ICP的方法需要在配准前使用其他方法进行一次粗配准，否则两个点云之间姿态差距较大会影响配准精度。"
+    ]
+  },
+  {
+    "category": "metadata",
+    "user_input": "我的知识库里上传了哪些论文？",
+    "reference": "知识库中共有 5 篇已上传并入库的论文：AdaPoinTr（Diverse Point Cloud Completion with Adaptive Geometry-Aware Transformers）、PCN（Point Completion Network）、PCT（Point Cloud Transformer）、基于深度学习的点云配准方法综述、基于深度学习的三维点云修复技术综述。",
+    "reference_contexts": []
+  },
+  {
+    "category": "metadata",
+    "user_input": "AdaPoinTr 这篇论文的作者是谁？",
+    "reference": "AdaPoinTr 的作者为 Xumin Yu、Yongming Rao、Ziyi Wang、Jiwen Lu、Jie Zhou。",
+    "reference_contexts": []
+  },
+  {
+    "category": "metadata",
+    "user_input": "基于深度学习的三维点云修复技术综述这篇论文的 DOI 是什么？",
+    "reference": "该论文的 DOI 为 10.3724/SP.J.1089.2021.18817。",
+    "reference_contexts": []
+  },
+  {
+    "category": "metadata",
+    "user_input": "我的知识库里有哪些论文已经入库可以被检索？",
+    "reference": "知识库中的 5 篇论文均已解析并入库（is_indexed=1），可被 search_paper_content 检索：AdaPoinTr、PCN、PCT、基于深度学习的点云配准方法综述、基于深度学习的三维点云修复技术综述。",
+    "reference_contexts": []
+  }
+]

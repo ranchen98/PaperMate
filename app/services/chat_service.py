@@ -4,6 +4,7 @@ from app.utils.checkpointer_handler import checkpointer
 from app.utils.db_handler import db_connection
 from app.agent.chat_agent import chat_agent
 from app.services.quota_service import quota_service
+from app.services.stream_registry import stream_registry
 from app.utils.logger_handler import logger
 from app.business.chat_request import ChatRequest
 from app.business.exceptions import BusinessException
@@ -13,6 +14,7 @@ import json
 class ChatService:
     def chat_streaming_response(self, request: ChatRequest):
         is_resume = request.message is None
+        cancel_event = stream_registry.register(request.thread_id)
         try:
             logger.info(f"[chat_streaming_response]: {str(request)}")
             if not is_resume:
@@ -23,6 +25,13 @@ class ChatService:
             seen_tool_indices: set[int] = set()
 
             for chunk, metadata in chat_agent.stream(request):
+                if cancel_event.is_set():
+                    logger.info(
+                        f"[chat_streaming_response] 收到停止信号，中断生成: "
+                        f"thread_id={request.thread_id}"
+                    )
+                    yield f"data: {json.dumps({'role': 'stopped'}, ensure_ascii=False)}\n\n"
+                    break
                 if isinstance(chunk, AIMessage):
                     if metadata.get("lc_source") == "summarization":
                         continue
@@ -82,6 +91,22 @@ class ChatService:
             logger.error(f"[chat_streaming_response]: {str(e)}")
             err = json.dumps({"code": 500, "message": str(e) or "调用失败"}, ensure_ascii=False)
             yield f"event: error\ndata: {err}\n\n"
+        finally:
+            stream_registry.unregister(request.thread_id)
+
+    def stop_streaming(self, user_id: str, thread_id: str):
+        """请求中断指定会话的流式生成。
+
+        仅校验会话归属（依赖 _get_thread_owner 返回 None 时静默跳过），
+        避免越权停止他人会话。无活跃流时静默返回。
+        """
+        logger.info(f"[stop_streaming]: user_id={user_id} thread_id={thread_id}")
+        owner = self._get_thread_owner(thread_id)
+        if owner is None:
+            return
+        if owner != user_id:
+            raise BusinessException(403, "无权访问该会话")
+        stream_registry.cancel(thread_id)
 
     def get_thread_ids(self, user_id: str):
         logger.info(f"[get_thread_ids]: {user_id}")

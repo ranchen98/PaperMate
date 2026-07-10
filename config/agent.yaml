@@ -1,4 +1,4 @@
-chat_model_name: qwen3.7-max-2026-06-08
+chat_model_name: qwen3.7-max-2026-05-20
 chat_model_provider: openai
 embedding_model_name: text-embedding-v4
 summary_model_name: qwen-turbo

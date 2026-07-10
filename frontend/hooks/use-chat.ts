@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchHistory, resumeChat, streamChat } from "@/lib/api";
+import { useCallback, useEffect, useState } from "react";
+import { fetchHistory, resumeChat, stopChat, streamChat } from "@/lib/api";
 import type {
   AgentCard,
   AgentCardSection,
@@ -170,7 +170,6 @@ export function useChat(
   const [isInterrupted, setIsInterrupted] = useState(false);
   const [rewindCheckpointId, setRewindCheckpointId] = useState<string | null>(null);
   const [rewindDraft, setRewindDraft] = useState<{ text: string; nonce: number } | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!threadId) {
@@ -212,8 +211,9 @@ export function useChat(
     async (
       stream: AsyncGenerator<StreamEvent, void, unknown>,
       mode: AgentMode,
-    ) => {
+    ): Promise<boolean> => {
       let aiMsgId: string | null = null;
+      let completed = true;
 
       const ensureAiMsg = (): string => {
         if (aiMsgId !== null) return aiMsgId;
@@ -234,6 +234,10 @@ export function useChat(
 
       try {
         for await (const ev of stream) {
+          if (ev.role === "stopped") {
+            completed = false;
+            break;
+          }
           if (ev.role === "tool") {
             const id = ensureAiMsg();
             const call: ToolCall = {
@@ -325,18 +329,24 @@ export function useChat(
                 return {
                   ...m,
                   isStreaming: false,
-                  isReportReady: true,
+                  isReportReady: completed,
+                  isInterrupted: !completed,
                   agentCards: m.agentCards?.map((c) => ({
                     ...c,
                     status: "done" as const,
                   })),
                 };
               }
-              return { ...m, isStreaming: false };
+              return {
+                ...m,
+                isStreaming: false,
+                isInterrupted: !completed,
+              };
             }),
           );
         }
       }
+      return completed;
     },
     [],
   );
@@ -449,8 +459,12 @@ export function useChat(
   }, [threadId]);
 
   const stopStreaming = useCallback(() => {
-    abortRef.current?.abort();
-  }, []);
+      if (!threadId) return;
+      setIsInterrupted(true);
+      stopChat(threadId).catch((err) => {
+        console.error("[useChat] stop error:", err);
+      });
+    }, [threadId]);
 
   const clearMessages = useCallback(() => {
     setMessages([]);

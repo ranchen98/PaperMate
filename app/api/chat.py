@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse, Response
 from app.api.deps import require_user
-from app.business.chat_request import ChatRequest
+from app.business.chat_request import ChatRequest, StopRequest
 from app.business.user import User
 from app.services.chat_service import chat_service
 from app.utils.logger_handler import logger
@@ -13,6 +13,16 @@ async def chat_stream(request: ChatRequest, user: User = Depends(require_user)):
     """调用agent对话 (流式)"""
     request.user_id = user.user_id
     return StreamingResponse(chat_service.chat_streaming_response(request), media_type="text/event-stream")
+
+@router.post("/chat/stop")
+async def chat_stop(request: StopRequest, user: User = Depends(require_user)):
+    """中断指定会话的流式生成"""
+    chat_service.stop_streaming(user.user_id, request.thread_id)
+    return {
+        "code": 200,
+        "message": "success",
+        "data": None
+    }
 
 @router.post("/chat/resume")
 async def chat_resume(request: ChatRequest, user: User = Depends(require_user)):

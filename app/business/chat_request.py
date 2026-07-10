@@ -16,3 +16,7 @@ class ChatRequest(BaseModel):
         default=None,
         description="分叉点 checkpoint ID；指定时从该 checkpoint 分叉（对话回溯）",
     )
+
+
+class StopRequest(BaseModel):
+    thread_id: str = Field(..., description="会话 ID")
