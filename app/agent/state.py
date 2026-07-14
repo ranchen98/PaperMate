@@ -40,10 +40,8 @@ class MultiAgentState(TypedDict, total=False):
     research_notes: Annotated[Dict[str, Dict[str, Any]], _dict_merge_reducer]
     all_citations: Annotated[Dict[str, Dict[str, Any]], _dict_merge_reducer]
 
-    # ── 4. 写作层 (生产者: Section Writer | 消费者: 下一个 Writer, Editor) ──
+    # ── 4. 写作层 (生产者: Section Writer | 消费者: Editor) ──
     section_drafts: Annotated[Dict[str, Dict[str, Any]], _dict_merge_reducer]
-    cumulative_summaries: str
-    current_writing_index: int
 
     # ── 5. 交付层 (生产者: Global Editor | 消费者: 用户) ──
     final_report: str

@@ -1,7 +1,7 @@
 """多 Agent 工具函数：token 近似计数、笔记压缩、引用映射。"""
 
 import re
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 from app.agent.model.factory import summary_model
 from app.utils.logger_handler import logger
@@ -75,10 +75,26 @@ _FILE_ID_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+_FAKE_FILE_IDS = {
+    "0" * 32,
+    "f" * 32,
+    "1" * 32,
+    "a" * 32,
+    "1234567890" * 3 + "12",
+    "abcdef" * 5 + "ab",
+}
+
+
+def _is_fake_file_id(file_id: str) -> bool:
+    """检测 file_id 是否为编造的伪 ID（全零、全 f、明显非真实 hex）。"""
+    if not file_id or len(file_id) != 32:
+        return True
+    return file_id.lower() in _FAKE_FILE_IDS
+
 
 def map_citations_to_brackets(
     section_drafts: Dict[str, Dict], all_citations: Dict[str, Dict]
-) -> Tuple[str, str]:
+) -> Tuple[List[Dict[str, str]], str]:
     """将正文中的 file_id 替换为 [1], [2] 并生成参考文献列表。
 
     Args:
@@ -86,10 +102,13 @@ def map_citations_to_brackets(
         all_citations: {ref_id: {file_id, source, ...}}。
 
     Returns:
-        (final_report_text, references_text)
+        (sections, references_text) where sections is a sorted list of
+        dicts: {"section_id", "title", "content"} with citations already
+        replaced by bracket notation [N].
     """
+    sorted_sids = sorted(section_drafts.keys())
     full_text_parts = []
-    for sid in sorted(section_drafts.keys()):
+    for sid in sorted_sids:
         draft = section_drafts[sid]
         title = draft.get("title", "")
         content = draft.get("content", "")
@@ -98,6 +117,7 @@ def map_citations_to_brackets(
     full_text = "\n\n".join(full_text_parts)
 
     file_ids = list(set(_FILE_ID_PATTERN.findall(full_text)))
+    file_ids = [fid for fid in file_ids if not _is_fake_file_id(fid)]
     file_ids.sort()
 
     bracket_map: Dict[str, int] = {}
@@ -110,7 +130,13 @@ def map_citations_to_brackets(
             return f"[{bracket_map[fid]}]"
         return match.group(0)
 
-    final_text = _FILE_ID_PATTERN.sub(_replace_ref, full_text)
+    sections = []
+    for sid in sorted_sids:
+        draft = section_drafts[sid]
+        title = draft.get("title", "")
+        content = draft.get("content", "")
+        mapped_content = _FILE_ID_PATTERN.sub(_replace_ref, content)
+        sections.append({"section_id": sid, "title": title, "content": mapped_content})
 
     ref_lines = ["## 参考文献\n"]
     for fid in file_ids:
@@ -127,4 +153,4 @@ def map_citations_to_brackets(
         f"[map_citations] 共映射 {len(file_ids)} 个引用："
         f"{[f'{fid[:8]}...→[{bracket_map[fid]}]' for fid in file_ids]}"
     )
-    return final_text, references
+    return sections, references

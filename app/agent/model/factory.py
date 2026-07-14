@@ -72,9 +72,19 @@ class ThinkingChatOpenAI(ChatOpenAI):
 
 
 class ChatModelFactory(BaseModelFactory):
+    """创建带 thinking 的 chat 模型（ThinkingChatOpenAI）。
+
+    Args:
+        config_key: agent.yaml 中的配置键名。默认 "chat_model_name"（单 Agent / 默认），
+            多 Agent 场景下 Planner/Researcher 可指定各自的模型配置键。
+    """
+
+    def __init__(self, config_key: str = "chat_model_name"):
+        self._config_key = config_key
+
     def new(self) -> BaseChatModel:
         return ThinkingChatOpenAI(
-            model=agent_config["chat_model_name"],
+            model=agent_config[self._config_key],
             base_url=env.DASHSCOPE_BASE_URL,
             api_key=env.DASHSCOPE_API_KEY,
             streaming=True,
@@ -83,6 +93,31 @@ class ChatModelFactory(BaseModelFactory):
 
 
 chat_model = ChatModelFactory().new()
+planner_model = ChatModelFactory("planner_model_name").new()
+researcher_model = ChatModelFactory("researcher_model_name").new()
+
+
+class ScriptingModelFactory(BaseModelFactory):
+    """Writer/Editor 用的非 thinking 模型（绕过 ReAct 框架，直接调用），降低延迟与 token 消耗。
+
+    Args:
+        config_key: agent.yaml 中的配置键名（writer_model_name / editor_model_name）。
+    """
+
+    def __init__(self, config_key: str = "writer_model_name"):
+        self._config_key = config_key
+
+    def new(self) -> BaseChatModel:
+        return ChatOpenAI(
+            model=agent_config[self._config_key],
+            base_url=env.DASHSCOPE_BASE_URL,
+            api_key=env.DASHSCOPE_API_KEY,
+            streaming=True,
+        )
+
+
+writer_model = ScriptingModelFactory("writer_model_name").new()
+editor_model = ScriptingModelFactory("editor_model_name").new()
 
 
 class EmbeddingsFactory(BaseModelFactory):

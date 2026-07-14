@@ -33,6 +33,8 @@ class ChatService:
                     yield f"data: {json.dumps({'role': 'stopped'}, ensure_ascii=False)}\n\n"
                     break
                 if isinstance(chunk, AIMessage):
+                    if not metadata or not isinstance(metadata, dict):
+                        metadata = {}
                     if metadata.get("lc_source") == "summarization":
                         continue
 

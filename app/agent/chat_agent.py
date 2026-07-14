@@ -149,8 +149,12 @@ class ChatAgent:
             stream_mode=["updates", "custom"],
         ):
             if mode == "updates":
+                if not data or not isinstance(data, dict):
+                    continue
                 for _node_name, node_output in data.items():
-                    messages = node_output.get("messages", [])
+                    if node_output is None:
+                        continue
+                    messages = (node_output or {}).get("messages", [])
                     for msg in messages:
                         if isinstance(msg, (AIMessage, AIMessageChunk)):
                             if msg.content:
@@ -162,6 +166,8 @@ class ChatAgent:
                                     metadata["section_title"] = ak["section_title"]
                                 yield AIMessageChunk(content=msg.content), metadata
             elif mode == "custom":
+                if not data or not isinstance(data, dict):
+                    continue
                 content = data.get("content", "")
                 if content:
                     yield AIMessageChunk(content=content), {

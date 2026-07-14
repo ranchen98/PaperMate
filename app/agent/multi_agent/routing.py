@@ -11,32 +11,58 @@ from app.utils.logger_handler import logger
 def fanout_to_researchers(state: MultiAgentState) -> List[Send]:
     """Planner 完成后，按 detailed_outline 中每个章节派发并行 Researcher。
 
+    Send payload 显式传递父 state 的共享字段，使子节点的 state 完整可用
+    （LangGraph Send 不自动继承父 state 通道）。
+
     Returns:
-        List[Send]: 每个章节一个 Send，携带 current_section 作为节点输入。
+        List[Send]: 每个章节一个 Send，携带 current_section 及共享上下文字段。
     """
     detailed_outline = state.get("detailed_outline", [])
     if not detailed_outline:
         logger.warning("[Routing] detailed_outline 为空，无法派发 Researcher")
         return []
 
+    brief_outline = state.get("brief_outline", "")
+
     sends = []
     for section in detailed_outline:
         sends.append(
-            Send("researcher", {"current_section": section})
+            Send("researcher", {
+                "current_section": section,
+                "brief_outline": brief_outline,
+                "detailed_outline": detailed_outline,
+            })
         )
     logger.info(f"[Routing] 派发 {len(sends)} 个并行 Researcher")
     return sends
 
 
-def route_after_writing(state: MultiAgentState) -> Union[str, List[str]]:
-    """Writer 节点完成后，判断下一跳：继续写下一章 or 进入编辑阶段。"""
-    current_idx = state.get("current_writing_index", 0)
-    detailed_outline = state.get("detailed_outline", [])
-    total = len(detailed_outline)
+def fanout_to_writers(state: MultiAgentState) -> List[Send]:
+    """Researcher 全部完成后，按 detailed_outline 中每个章节派发并行 Writer。
 
-    if current_idx < total:
-        logger.info(f"[Routing] 继续写作: {current_idx + 1}/{total}")
-        return "writer"
-    else:
-        logger.info("[Routing] 所有章节撰写完成，进入全局编辑")
-        return "editor"
+    Send payload 显式传递父 state 的共享字段（特别是 research_notes），
+    使 Writer 能读取到本章节的研究笔记和全局上下文。
+
+    Returns:
+        List[Send]: 每个章节一个 Send，携带 current_section 及共享上下文字段。
+    """
+    detailed_outline = state.get("detailed_outline", [])
+    if not detailed_outline:
+        logger.warning("[Routing] detailed_outline 为空，无法派发 Writer")
+        return []
+
+    brief_outline = state.get("brief_outline", "")
+    research_notes = state.get("research_notes", {})
+
+    sends = []
+    for section in detailed_outline:
+        sends.append(
+            Send("writer", {
+                "current_section": section,
+                "research_notes": research_notes,
+                "brief_outline": brief_outline,
+                "detailed_outline": detailed_outline,
+            })
+        )
+    logger.info(f"[Routing] 派发 {len(sends)} 个并行 Writer")
+    return sends
