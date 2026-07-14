@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AuthUser,
   ChatRequest,
   HistoryResponse,
@@ -44,11 +44,11 @@ async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export async function fetchMe(): Promise<AuthUser> {
-  return getJson<AuthUser>("/auth/me");
+  return getJson<AuthUser>("/api/auth/me");
 }
 
 export async function login(username: string, password: string): Promise<AuthUser> {
-  return getJson<AuthUser>("/auth/login", {
+  return getJson<AuthUser>("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
@@ -56,7 +56,7 @@ export async function login(username: string, password: string): Promise<AuthUse
 }
 
 export async function register(username: string, password: string): Promise<AuthUser> {
-  return getJson<AuthUser>("/auth/register", {
+  return getJson<AuthUser>("/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
@@ -64,25 +64,25 @@ export async function register(username: string, password: string): Promise<Auth
 }
 
 export async function logout(): Promise<void> {
-  await getJson<null>("/auth/logout", { method: "POST" });
+  await getJson<null>("/api/auth/logout", { method: "POST" });
 }
 
 export async function fetchThreads(): Promise<ThreadListResponse> {
-  return getJson<ThreadListResponse>(`/chat/get_thread_ids`);
+  return getJson<ThreadListResponse>(`/api/chat/get_thread_ids`);
 }
 
 export async function fetchHistory(threadId: string): Promise<HistoryResponse> {
   return getJson<HistoryResponse>(
-    `/chat/get_history?thread_id=${encodeURIComponent(threadId)}`,
+    `/api/chat/get_history?thread_id=${encodeURIComponent(threadId)}`,
   );
 }
 
 export async function deleteThread(threadId: string): Promise<void> {
-  await getJson(`/chat/delete_session?thread_id=${encodeURIComponent(threadId)}`);
+  await getJson(`/api/chat/delete_session?thread_id=${encodeURIComponent(threadId)}`);
 }
 
 export async function fetchPapers(): Promise<PaperFile[]> {
-  return getJson<PaperFile[]>(`/paper/files`);
+  return getJson<PaperFile[]>(`/api/paper/files`);
 }
 
 export async function uploadPapers(
@@ -95,7 +95,7 @@ export async function uploadPapers(
   }
   form.append("topic", topic);
 
-  const res = await fetch("/paper/upload", {
+  const res = await fetch("/api/paper/upload", {
     method: "POST",
     credentials: "same-origin",
     body: form,
@@ -118,7 +118,7 @@ export async function uploadPapers(
 
 export async function downloadReport(threadId: string): Promise<void> {
   const res = await fetch(
-    `/chat/download_report?thread_id=${encodeURIComponent(threadId)}`,
+    `/api/chat/download_report?thread_id=${encodeURIComponent(threadId)}`,
     { credentials: "same-origin" },
   );
   if (!res.ok) {
@@ -140,7 +140,7 @@ export async function downloadReport(threadId: string): Promise<void> {
 }
 
 export async function deletePaper(fileId: string): Promise<void> {
-  const res = await fetch(`/paper/files/${encodeURIComponent(fileId)}`, {
+  const res = await fetch(`/api/paper/files/${encodeURIComponent(fileId)}`, {
     method: "DELETE",
     credentials: "same-origin",
   });
@@ -160,7 +160,7 @@ export async function deletePaper(fileId: string): Promise<void> {
 }
 
 export async function stopChat(threadId: string): Promise<void> {
-  await getJson<null>(`/chat/stop`, {
+  await getJson<null>(`/api/chat/stop`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ thread_id: threadId }),
@@ -171,7 +171,7 @@ export async function* streamChat(
   request: ChatRequest,
   signal?: AbortSignal,
 ): AsyncGenerator<StreamEvent, void, unknown> {
-  const res = await fetch("/chat/stream", {
+  const res = await fetch("/api/chat/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
@@ -191,7 +191,7 @@ export async function* resumeChat(
   request: ResumeRequest,
   signal?: AbortSignal,
 ): AsyncGenerator<StreamEvent, void, unknown> {
-  const res = await fetch("/chat/resume", {
+  const res = await fetch("/api/chat/resume", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
