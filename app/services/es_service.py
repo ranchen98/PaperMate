@@ -18,7 +18,11 @@ MD_DIR = get_abs_path(es_config["md_file_path"])
 
 class EsService:
     def __init__(self):
-        kwargs = {}
+        kwargs = {
+            "request_timeout": 60,
+            "retry_on_timeout": True,
+            "max_retries": 3,
+        }
         if env.ES_USERNAME:
             kwargs["basic_auth"] = (env.ES_USERNAME, env.ES_PASSWORD)
         self.es = Elasticsearch(env.ES_HOST, **kwargs)
@@ -170,7 +174,22 @@ class EsService:
                             "source": doc.metadata["source"],
                         },
                     })
-                helpers.bulk(self.es, actions)
+                success, errors = helpers.bulk(
+                    self.es,
+                    actions,
+                    chunk_size=100,
+                    max_retries=3,
+                    initial_backoff=2,
+                    raise_on_error=False,
+                    raise_on_exception=False,
+                )
+                if errors:
+                    logger.warning(
+                        f"[加载知识库]{file_name} bulk 部分失败：成功 {success}/{len(actions)}，"
+                        f"失败项数 {len(errors)}，首条错误={errors[0]}"
+                    )
+                else:
+                    logger.info(f"[加载知识库]{file_name} bulk 全部成功（{success}/{len(actions)}）")
 
                 cursor.execute(
                     "UPDATE paper_file SET is_indexed = 1, update_time = CURRENT_TIMESTAMP WHERE file_id = ?",

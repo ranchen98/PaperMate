@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { deletePaper, fetchPapers, uploadPapers } from "@/lib/api";
 import type { PaperFile } from "@/lib/types";
 
@@ -35,6 +35,25 @@ export function usePapers(enabled: boolean = true) {
     }
     loadInitial();
   }, [enabled, loadInitial]);
+
+  const pollingRef = useRef(false);
+  useEffect(() => {
+    if (!enabled) return;
+    const hasProcessing = files.some((f) => f.is_indexed === 0);
+    if (!hasProcessing) return;
+
+    const timer = setInterval(async () => {
+      if (pollingRef.current) return;
+      pollingRef.current = true;
+      try {
+        await refresh();
+      } finally {
+        pollingRef.current = false;
+      }
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [enabled, files, refresh]);
 
   const upload = useCallback(
     async (newFiles: File[]) => {

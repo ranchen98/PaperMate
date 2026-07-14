@@ -31,6 +31,8 @@ def _row_to_paper_file(row) -> PaperFile:
         file_path=row["file_path"],
         md5=row["md5"],
         topic=row["topic"] or "",
+        is_md_parsed=int(row["is_md_parsed"]) if row["is_md_parsed"] is not None else 0,
+        is_indexed=int(row["is_indexed"]) if row["is_indexed"] is not None else 0,
         upload_time=(row["upload_time"].replace(" ", "T") + "Z") if row["upload_time"] else "",
         update_time=(row["update_time"].replace(" ", "T") + "Z") if row["update_time"] else "",
     )

@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Upload, Trash2, FileText, Loader2 } from "lucide-react";
+import { Upload, Trash2, FileText, Loader2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatTime } from "@/lib/utils";
+import { Loader } from "@/components/prompt-kit/loader";
+import { formatTime, cn } from "@/lib/utils";
 import type { PaperFile } from "@/lib/types";
 
 type KnowledgeBaseProps = {
@@ -14,6 +15,16 @@ type KnowledgeBaseProps = {
   onUpload: (files: File[]) => void;
   onDelete: (fileId: string) => void;
 };
+
+type PaperStatus =
+  | { label: string; variant: "wave" | "pulse"; done: false }
+  | { label: string; variant: null; done: true };
+
+function getPaperStatus(file: PaperFile): PaperStatus {
+  if (file.is_indexed === 1) return { label: "已入库", variant: null, done: true };
+  if (file.is_md_parsed === 1) return { label: "构建索引中", variant: "pulse", done: false };
+  return { label: "解析中", variant: "wave", done: false };
+}
 
 export function KnowledgeBase({
   files,
@@ -90,36 +101,46 @@ export function KnowledgeBase({
           </div>
         ) : (
           <ul className="space-y-2">
-            {files.map((file) => (
-              <li
-                key={file.file_id}
-                className="group flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50"
-              >
-                <FileText className="size-5 shrink-0 text-primary" />
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="truncate text-sm font-medium">
-                    {file.file_name}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {formatTime(file.upload_time)}
-                  </span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-                  onClick={() => handleDelete(file.file_id)}
-                  disabled={pendingDelete === file.file_id}
-                  title="删除文件"
+            {files.map((file) => {
+              const status = getPaperStatus(file);
+              return (
+                <li
+                  key={file.file_id}
+                  className="group flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50"
                 >
-                  {pendingDelete === file.file_id ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="text-destructive" />
-                  )}
-                </Button>
-              </li>
-            ))}
+                  <FileText className="size-5 shrink-0 text-primary" />
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate text-sm font-medium">
+                      {file.file_name}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatTime(file.upload_time)}
+                    </span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <Check className={cn("size-3.5 text-green-500", !status.done && "hidden")} />
+                    <Loader variant={status.variant ?? "wave"} size="sm" className={cn(status.done && "hidden")} />
+                    <span className="text-xs text-muted-foreground">
+                      {status.label}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                    onClick={() => handleDelete(file.file_id)}
+                    disabled={pendingDelete === file.file_id}
+                    title="删除文件"
+                  >
+                    {pendingDelete === file.file_id ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="text-destructive" />
+                    )}
+                  </Button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

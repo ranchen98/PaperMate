@@ -104,6 +104,8 @@ export type PaperFile = {
   file_path: string;
   md5: string;
   topic: string;
+  is_md_parsed: number;
+  is_indexed: number;
   upload_time: string;
   update_time: string;
 };

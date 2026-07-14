@@ -13,6 +13,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      additional_contexts:
+        root: .
     image: papermate-frontend:latest
     environment:
       - BACKEND_URL=http://backend:8000

@@ -28,6 +28,7 @@ export default function RootLayout({
   return (
     <html
       lang="zh-CN"
+      data-version={process.env.NEXT_PUBLIC_APP_VERSION}
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
